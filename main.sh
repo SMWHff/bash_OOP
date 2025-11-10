@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 面向对象系统 - 装饰器修复版
+# 面向对象系统 - 最终完善版
 declare -A OBJECT_PROPS
 declare -A OBJECT_PRIVATE
 declare -A CLASS_METHODS
@@ -323,55 +323,142 @@ Object.static "Object" "systemInfo" '
     echo "关系数量: ${#OBJECT_RELATIONS[@]}"
     
     echo -n "定义的类: "
-    declare -F | grep -oE "[a-zA-Z_][a-zA-Z0-9_]*\." | sort -u | tr -d '.' | tr '\n' ' '
+    declare -F | grep -oE "[a-zA-Z_][a-zA-Z0-9_]*\." | cut -d. -f1 | sort -u | tr '\n' ' '
     echo ""
     echo "总方法数: $(declare -F | wc -l)"
 '
 
+## 添加对象清理功能
+Object.static "Object" "cleanup" '
+    echo "=== 系统清理 ==="
+    local count_before=${#OBJECT_PROPS[@]}
+    
+    # 找出所有对象实例
+    local instances=()
+    for key in "${!OBJECT_PROPS[@]}"; do
+        if [[ "$key" == *"__class" ]]; then
+            local instance="${key%__class}"
+            instances+=("$instance")
+        fi
+    done
+    
+    # 清理每个对象
+    for instance in "${instances[@]}"; do
+        echo "清理对象: $instance"
+        # 删除对象的所有属性
+        for key in "${!OBJECT_PROPS[@]}"; do
+            if [[ "$key" == ${instance}__* ]]; then
+                unset OBJECT_PROPS["$key"]
+            fi
+        done
+        # 删除对象的私有属性
+        for key in "${!OBJECT_PRIVATE[@]}"; do
+            if [[ "$key" == ${instance}__* ]]; then
+                unset OBJECT_PRIVATE["$key"]
+            fi
+        done
+        # 删除对象的关系
+        for key in "${!OBJECT_RELATIONS[@]}"; do
+            if [[ "$key" == ${instance}__* ]]; then
+                unset OBJECT_RELATIONS["$key"]
+            fi
+        done
+    done
+    
+    local count_after=${#OBJECT_PROPS[@]}
+    echo "清理完成: 移除 $((count_before - count_after)) 个属性"
+'
+
 ## 高级特性演示
-echo "=== 面向对象系统 - 装饰器修复演示 ==="
+echo "=== Bash 面向对象系统 - 完整演示 ==="
 
-echo -e "\n=== 基础对象创建 ==="
-Object.create "Employee" "emp1"
-Employee.constructor "emp1" "程序员A" "28" "科技公司"
+echo -e "\n=== 设计模式演示 ==="
 
-echo -e "\n=== 装饰器模式演示 ==="
-echo "应用装饰器前:"
-Employee.work "emp1"
+echo -e "\n1. 单例模式:"
+logger_instance=$(Object.singleton "Logger" "global_logger")
+Logger.constructor "$logger_instance" "全局日志器"
 
-echo -e "\n应用装饰器:"
-Employee.addBonus "emp1" "0.15"
+echo -e "\n2. 观察者模式:"
+Object.create "Employee" "ceo"
+Employee.constructor "ceo" "张总裁" "45" "集团总部"
+Object.addObserver "ceo" "global_logger" "promotion"
+Employee.promote "ceo" "CEO"
 
-echo -e "\n应用装饰器后:"
-Employee.work "emp1"
+echo -e "\n3. 装饰器模式:"
+Object.create "Employee" "star_employee"
+Employee.constructor "star_employee" "明星员工" "30" "科技公司"
+echo "装饰前:"
+Employee.work "star_employee"
+Employee.addBonus "star_employee" "0.2"
+echo "装饰后:"
+Employee.work "star_employee"
 
-echo -e "\n=== 验证其他对象不受影响 ==="
-Object.create "Employee" "emp2"
-Employee.constructor "emp2" "程序员B" "26" "科技公司"
-echo "emp2 (未装饰):"
-Employee.work "emp2"
+echo -e "\n4. 工厂模式:"
+dev1=$(Employee::createDeveloper "小李" "25" "科技公司")
+mgr1=$(Employee::createManager "王经理" "35" "科技公司" "研发部")
+Employee.getInfo "$dev1"
+Manager.getInfo "$mgr1"
 
-echo -e "\n=== 再次验证emp1 ==="
-Employee.work "emp1"
+echo -e "\n5. 策略模式:"
+Object.attr "$dev1" "salary" "12000"
+Object.attr "$mgr1" "salary" "25000"
+Object.attr "$ceo" "salary" "50000"
+echo "开发工资: 12000 -> $(SalaryCalculator::calculate "developer" "$dev1")"
+echo "经理工资: 25000 -> $(SalaryCalculator::calculate "manager" "$mgr1")"
+echo "CEO工资: 50000 -> $(SalaryCalculator::calculate "ceo" "ceo")"
+
+echo -e "\n=== 继承和多态 ==="
+Object.create "Manager" "sales_mgr"
+Manager.constructor "sales_mgr" "销售经理" "40" "科技公司" "销售部"
+Manager.addToTeam "sales_mgr" "star_employee"
+Manager.manageTeam "sales_mgr"
+
+echo -e "\n=== 系统信息 ==="
+Object::systemInfo
 
 echo -e "\n=== 性能测试 ==="
 Object.static "Object" "performanceTest" '
-    echo "性能测试 - 创建多个对象:"
+    echo "创建100个对象性能测试:"
     local start_time=$(date +%s%N)
     
-    for i in {1..5}; do
-        Object.create "Person" "perf_test_$i"
-        Person.constructor "perf_test_$i" "PerfTest$i" "$((20 + i))"
+    for i in {1..20}; do
+        Object.create "Person" "batch_obj_$i" >/dev/null
+        Person.constructor "batch_obj_$i" "Batch$i" "$((20 + i % 10))" >/dev/null
     done
     
     local end_time=$(date +%s%N)
     local duration=$(( (end_time - start_time) / 1000000 ))
-    echo "创建5个对象耗时: ${duration}ms"
+    echo "创建20个对象耗时: ${duration}ms"
+    echo "平均每个对象: $(echo "scale=3; $duration / 20" | bc)ms"
 '
 
 Object::performanceTest
 
-echo -e "\n=== 系统信息 ==="
+echo -e "\n=== 内存管理演示 ==="
 Object::systemInfo
+echo -e "\n执行清理..."
+Object::cleanup
+echo -e "\n清理后系统状态:"
+Object::systemInfo
+
+echo -e "\n=== 系统特性总结 ==="
+echo "✅ 已实现的功能:"
+echo "   - 类与对象创建"
+echo "   - 属性管理 (公共/私有)"
+echo "   - 方法定义和调用"
+echo "   - 继承和多态"
+echo "   - 接口模拟"
+echo "   - 设计模式: 单例、观察者、装饰器、工厂、策略"
+echo "   - 对象关系管理"
+echo "   - 序列化和反序列化"
+echo "   - 反射和自省"
+echo "   - 内存管理和清理"
+echo "   - 性能监控"
+
+echo -e "\n🎯 适用场景:"
+echo "   - 复杂的Shell脚本组织"
+echo "   - 配置管理系统"
+echo "   - 原型设计和教学"
+echo "   - 需要面向对象思维的自动化任务"
 
 echo -e "\n=== 演示完成 ==="
