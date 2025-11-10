@@ -132,7 +132,7 @@ Object.method "Object" "setAttrWithValidation" '
     fi
 '
 
-# 修复数据库保存函数 - 支持多对象存储
+# 修复数据库保存函数
 Object.static "Object" "saveToDB" '
     local instance="$1"
     local class=$(Object.attr "$instance" "class")
@@ -221,18 +221,20 @@ Object.static "Object" "loadFromDB" '
     fi
 '
 
-# 添加数据库工具函数
+# 修复数据库列表函数 - 无语法错误版本
 Object.static "Object" "listDBObjects" '
     local class="$1"
     echo "=== 数据库中的 $class 对象 ==="
-    for file in db_${class}_*.txt 2>/dev/null; do
-        if [ -f "$file" ]; then
+    # 使用更安全的方式来处理文件查找
+    for file in db_${class}_*.txt; do
+        if [ -e "$file" ]; then
             local instance=$(basename "$file" .txt | sed "s/db_${class}_//")
             echo "对象: $instance, 文件: $file"
         fi
     done
 '
 
+# 修复数据库清理函数
 Object.static "Object" "cleanupDB" '
     echo "清理数据库文件..."
     rm -f db_*.txt 2>/dev/null
@@ -289,7 +291,7 @@ Object.static "Object" "cacheSet" '
     local expire_time=$(( $(date +%s) + ttl ))
     OBJECT_CACHE["${key}__value"]="$value"
     OBJECT_CACHE["${key}__expire"]="$expire_time"
-    echo "缓存设置: $key -> $value (TTL: ${ttl}s)" >&2
+    echo "缓存设置: $key -> $value (TTL: ${ttl}s)"
 '
 
 Object.static "Object" "cacheGet" '
@@ -299,11 +301,11 @@ Object.static "Object" "cacheGet" '
     local current_time=$(date +%s)
     
     if [ -n "$value" ] && [ "$current_time" -lt "$expire" ]; then
-        echo "缓存命中: $key -> $value" >&2
+        echo "缓存命中: $key -> $value"
         echo "$value"
         return 0
     else
-        echo "缓存未命中: $key" >&2
+        echo "缓存未命中: $key"
         return 1
     fi
 '
