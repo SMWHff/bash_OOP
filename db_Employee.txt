@@ -1,0 +1,8 @@
+#OBJECT_START test_emp 2025-11-10 15:18:19
+PROP:salary=50000
+PROP:company=测试公司
+PROP:age=28
+PROP:permissions__employee= read work
+PROP:name=测试员工
+PROP:position=测试工程师
+#OBJECT_END test_emp
