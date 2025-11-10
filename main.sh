@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 面向对象系统 - 修复版
+# 面向对象系统 - 最终修复版
 declare -A OBJECT_PROPS
 
 Object() {
@@ -29,49 +29,52 @@ Object.method() {
     shift 2
     local body="$*"
     
-    # 使用函数定义而不是eval，避免参数被当作命令执行
+    # 创建方法函数
     eval "
-        $class.$method() {
+        ${class}.${method}() {
             local this=\"\$1\"
             shift
-            $body \"\$@\"
+            $body
         }
     "
 }
 
-# 定义 Person 类的方法 - 使用单引号避免过早展开
+# 定义 Person 类的方法 - 使用正确的语法
 Object.method "Person" "constructor" '
-    local name="$1" age="$2"
-    echo "构造函数: name=\"\$name\", age=\"\$age\""
-    Object.attr "\$this" "name" "\$name"
-    Object.attr "\$this" "age" "\$age"
-    return 0
+    local name="$1"
+    local age="$2"
+    echo "构造函数: name=\"$name\", age=\"$age\""
+    Object.attr "$this" "name" "$name"
+    Object.attr "$this" "age" "$age"
 '
 
 Object.method "Person" "greet" '
-    local name="\$(Object.attr "\$this" "name")"
-    local age="\$(Object.attr "\$this" "age")"
-    echo "Hello, I am \$name, \$age years old!"
+    local name=$(Object.attr "$this" "name")
+    local age=$(Object.attr "$this" "age")
+    echo "Hello, I am $name, $age years old!"
 '
 
 Object.method "Person" "birthday" '
-    local current_age="\$(Object.attr "\$this" "age")"
-    local new_age=\$((current_age + 1))
-    Object.attr "\$this" "age" "\$new_age"
-    echo "Happy birthday! Now I am \$new_age years old"
+    local current_age=$(Object.attr "$this" "age")
+    local new_age=$((current_age + 1))
+    Object.attr "$this" "age" "$new_age"
+    echo "Happy birthday! Now I am $new_age years old"
 '
 
 Object.method "Person" "introduce" '
-    local name="\$(Object.attr "\$this" "name")"
-    local age="\$(Object.attr "\$this" "age")"
-    local job="\$(Object.attr "\$this" "job")"
-    echo "我叫\$name，今年\$age岁，职业是\${job:-未设置}"
+    local name=$(Object.attr "$this" "name")
+    local age=$(Object.attr "$this" "age")
+    local job=$(Object.attr "$this" "job")
+    if [ -z "$job" ]; then
+        job="未设置"
+    fi
+    echo "我叫$name，今年$age岁，职业是$job"
 '
 
 Object.method "Person" "setJob" '
-    local job="\$1"
-    Object.attr "\$this" "job" "\$job"
-    echo "职业设置为: \$job"
+    local job="$1"
+    Object.attr "$this" "job" "$job"
+    echo "职业设置为: $job"
 '
 
 ## 使用示例
@@ -113,16 +116,18 @@ Person.introduce "person2"
 echo -e "\n=== 继承演示 ==="
 # 创建 Student 类继承 Person
 Object.method "Student" "constructor" '
-    local name="\$1" age="\$2" student_id="\$3"
+    local name="$1"
+    local age="$2"
+    local student_id="$3"
     # 调用父类构造函数
-    Person.constructor "\$this" "\$name" "\$age"
-    Object.attr "\$this" "student_id" "\$student_id"
-    echo "学生构造函数: name=\"\$name\", student_id=\"\$student_id\""
+    Person.constructor "$this" "$name" "$age"
+    Object.attr "$this" "student_id" "$student_id"
+    echo "学生构造函数: name=\"$name\", student_id=\"$student_id\""
 '
 
 Object.method "Student" "study" '
-    local name="\$(Object.attr "\$this" "name")"
-    echo "\$name 正在学习..."
+    local name=$(Object.attr "$this" "name")
+    echo "$name 正在学习..."
 '
 
 # 创建学生实例
@@ -133,11 +138,27 @@ Student.study "student1"
 
 echo -e "\n=== 多态演示 ==="
 Object.method "Student" "greet" '
-    local name="\$(Object.attr "\$this" "name")"
-    local age="\$(Object.attr "\$this" "age")"
-    local student_id="\$(Object.attr "\$this" "student_id")"
-    echo "Hello, I am student \$name, \$age years old, ID: \$student_id"
+    local name=$(Object.attr "$this" "name")
+    local age=$(Object.attr "$this" "age")
+    local student_id=$(Object.attr "$this" "student_id")
+    echo "Hello, I am student $name, $age years old, ID: $student_id"
 '
 
 echo "重写greet方法后:"
 Student.greet "student1"
+
+echo -e "\n=== 内存管理演示 ==="
+Object.method "Person" "destroy" '
+    # 删除对象的所有属性
+    local prefix="${this}__"
+    for key in "${!OBJECT_PROPS[@]}"; do
+        if [[ "$key" == ${prefix}* ]]; then
+            unset OBJECT_PROPS["$key"]
+        fi
+    done
+    echo "对象 $this 已被销毁"
+'
+
+Person.destroy "person2"
+echo "person2销毁后属性:"
+Object.attr "person2" "name" 2>/dev/null || echo "属性不存在"
