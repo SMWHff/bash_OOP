@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# 面向对象系统 - 修复完善版
+# 面向对象系统 - 终极版
 declare -A OBJECT_PROPS
-declare -A OBJECT_PRIVATE  # 私有属性存储
-declare -A CLASS_METHODS   # 类方法存储
+declare -A OBJECT_PRIVATE
+declare -A CLASS_METHODS
+declare -A OBJECT_RELATIONS  # 对象关系存储
 
 Object() {
     : # 基类
@@ -15,6 +16,7 @@ Object.create() {
     echo "创建实例: $instance (类: $class)"
     OBJECT_PROPS["${instance}__class"]="$class"
     OBJECT_PROPS["${instance}__created"]="$(date '+%Y-%m-%d %H:%M:%S')"
+    OBJECT_PROPS["${instance}__id"]="obj_$(date +%s)_$RANDOM"
 }
 
 # 属性管理
@@ -29,7 +31,7 @@ Object.attr() {
     fi
 }
 
-# 私有属性（命名约定）
+# 私有属性
 Object.private() {
     local instance=$1 attr=$2
     local key="${instance}__private__${attr}"
@@ -56,7 +58,7 @@ Object.method() {
     "
 }
 
-# 类方法（静态方法）
+# 类方法
 Object.static() {
     local class=$1 method=$2
     shift 2
@@ -69,33 +71,69 @@ Object.static() {
     "
 }
 
-# 接口定义（模拟）
-Object.interface() {
-    local interface=$1
-    shift
-    CLASS_METHODS["${interface}__methods"]="$@"
+# 单例模式实现
+Object.singleton() {
+    local class=$1 instance=$2
+    local singleton_key="${class}__singleton"
+    
+    if [ -z "${OBJECT_PROPS[$singleton_key]}" ]; then
+        Object.create "$class" "$instance"
+        OBJECT_PROPS["$singleton_key"]="$instance"
+        echo "创建单例: $instance (类: $class)"
+    else
+        echo "返回已存在的单例: ${OBJECT_PROPS[$singleton_key]}"
+    fi
+    echo "${OBJECT_PROPS[$singleton_key]}"
 }
 
-# 检查是否实现接口
-Object.implements() {
-    local instance=$1 interface=$2
-    local class=$(Object.attr "$instance" "class")
-    local required_methods=${CLASS_METHODS["${interface}__methods"]}
+# 观察者模式实现
+Object.method "Object" "addObserver" '
+    local observer="$1"
+    local event="$2"
+    local key="${this}__observers__${event}"
+    OBJECT_PROPS["$key"]="${OBJECT_PROPS[$key]} $observer"
+    echo "添加观察者 $observer 监听事件 $event"
+'
+
+Object.method "Object" "notifyObservers" '
+    local event="$1"
+    local data="$2"
+    local key="${this}__observers__${event}"
+    local observers="${OBJECT_PROPS[$key]}"
     
-    for method in $required_methods; do
-        if ! type "${class}.${method}" &>/dev/null; then
-            echo "错误: 类 $class 没有实现接口 $interface 的方法 $method"
-            return 1
+    echo "通知事件: $event, 数据: $data"
+    for observer in $observers; do
+        if type "Object.onEvent" &>/dev/null; then
+            Object.onEvent "$observer" "$this" "$event" "$data"
         fi
     done
-    echo "实例 $instance 实现了接口 $interface"
-    return 0
-}
+'
 
-# 定义 Person 类的方法
+Object.method "Object" "onEvent" '
+    local source="$1"
+    local event="$2"
+    local data="$3"
+    echo "观察者 $this 收到来自 $source 的事件: $event, 数据: $data"
+'
+
+# 对象关系管理
+Object.method "Object" "addRelation" '
+    local relation="$1"
+    local target="$2"
+    local key="${this}__relations__${relation}"
+    OBJECT_RELATIONS["$key"]="${OBJECT_RELATIONS[$key]} $target"
+    echo "添加关系: $this -[$relation]-> $target"
+'
+
+Object.method "Object" "getRelated" '
+    local relation="$1"
+    local key="${this}__relations__${relation}"
+    echo "${OBJECT_RELATIONS[$key]}"
+'
+
+# 定义基础类
 Object.method "Person" "constructor" '
-    local name="$1"
-    local age="$2"
+    local name="$1" age="$2"
     echo "构造函数: name=\"$name\", age=\"$age\""
     Object.attr "$this" "name" "$name"
     Object.attr "$this" "age" "$age"
@@ -108,293 +146,266 @@ Object.method "Person" "greet" '
     echo "Hello, I am $name, $age years old!"
 '
 
-Object.method "Person" "birthday" '
-    local current_age=$(Object.attr "$this" "age")
-    local new_age=$((current_age + 1))
-    Object.attr "$this" "age" "$new_age"
-    echo "Happy birthday! Now I am $new_age years old"
-'
-
-Object.method "Person" "introduce" '
-    local name=$(Object.attr "$this" "name")
-    local age=$(Object.attr "$this" "age")
-    local job=$(Object.attr "$this" "job")
-    if [ -z "$job" ]; then
-        job="未设置"
-    fi
-    echo "我叫$name，今年$age岁，职业是$job"
-'
-
-Object.method "Person" "setJob" '
-    local job="$1"
-    Object.attr "$this" "job" "$job"
-    echo "职业设置为: $job"
-'
-
-Object.method "Person" "getSecret" '
-    local secret=$(Object.private "$this" "secret")
-    echo "我的秘密ID: ${secret:-未设置}"
-'
-
-# Person 类方法（静态方法）
-Object.static "Person" "getSpecies" '
-    echo "人类 (Homo sapiens)"
-'
-
-Object.static "Person" "createAdult" '
-    local name="$1"
-    local instance="${name}_adult"
-    Object.create "Person" "$instance"
-    Person.constructor "$instance" "$name" "18"
-    echo "创建成年实例: $instance"
-'
-
-# 定义接口
-Object.interface "Workable" "work takeBreak"
-Object.interface "Learnable" "study takeExam"
-
-# Employee 类实现接口
+# Employee 类
 Object.method "Employee" "constructor" '
     local name="$1" age="$2" company="$3"
     Person.constructor "$this" "$name" "$age"
     Object.attr "$this" "company" "$company"
     Object.attr "$this" "salary" "0"
+    Object.attr "$this" "position" "员工"
     echo "员工构造函数: company=\"$company\""
 '
 
 Object.method "Employee" "work" '
     local name=$(Object.attr "$this" "name")
     local company=$(Object.attr "$this" "company")
-    echo "$name 正在 $company 工作..."
+    local position=$(Object.attr "$this" "position")
+    echo "$name ($position) 正在 $company 工作..."
+    Object.notifyObservers "$this" "work" "$name 开始工作"
 '
 
-Object.method "Employee" "takeBreak" '
-    local name=$(Object.attr "$this" "name")
-    echo "$name 正在休息..."
-'
-
-Object.method "Employee" "setSalary" '
-    local salary="$1"
-    Object.attr "$this" "salary" "$salary"
-    echo "工资设置为: $salary"
+Object.method "Employee" "promote" '
+    local new_position="$1"
+    local old_position=$(Object.attr "$this" "position")
+    Object.attr "$this" "position" "$new_position"
+    echo "$(Object.attr "$this" "name") 晋升: $old_position -> $new_position"
+    Object.notifyObservers "$this" "promotion" "$new_position"
 '
 
 Object.method "Employee" "getInfo" '
     local name=$(Object.attr "$this" "name")
     local company=$(Object.attr "$this" "company")
     local salary=$(Object.attr "$this" "salary")
-    echo "员工信息: 姓名=$name, 公司=$company, 工资=$salary"
+    local position=$(Object.attr "$this" "position")
+    echo "员工信息: 姓名=$name, 职位=$position, 公司=$company, 工资=$salary"
 '
 
-# 手动继承Person的方法 - 修复继承链
+# 继承Person的方法
 Object.method "Employee" "greet" 'Person.greet "$this"'
 Object.method "Employee" "birthday" 'Person.birthday "$this"'
-Object.method "Employee" "introduce" 'Person.introduce "$this"'
-Object.method "Employee" "setJob" 'Person.setJob "$this" "$@"'
-Object.method "Employee" "getSecret" 'Person.getSecret "$this"'
 
-## 使用示例
-echo "=== 面向对象系统高级演示 ==="
-
-echo -e "\n=== 基础对象创建 ==="
-Object.create "Person" "person1"
-Person.constructor "person1" "Alice" "25"
-
-echo -e "\n=== 类方法演示 ==="
-Person::getSpecies
-Person::createAdult "Tom"
-
-echo -e "\n=== 接口实现演示 ==="
-Object.create "Employee" "emp1"
-Employee.constructor "emp1" "张工" "28" "科技公司"
-Object.implements "emp1" "Workable"
-
-echo -e "\n=== 接口方法调用 ==="
-Employee.work "emp1"
-Employee.takeBreak "emp1"
-
-echo -e "\n=== 私有属性演示 ==="
-Person.getSecret "person1"
-Employee.getSecret "emp1"
-
-echo -e "\n=== 员工功能演示 ==="
-Employee.setSalary "emp1" "15000"
-Employee.getInfo "emp1"
-Employee.greet "emp1"
-Employee.birthday "emp1"
-Employee.getInfo "emp1"
-
-echo -e "\n=== 多态和组合演示 ==="
-
-# 创建部门类
-Object.method "Department" "constructor" '
-    local name="$1"
-    Object.attr "$this" "name" "$name"
-    Object.attr "$this" "employees" ""
-    echo "部门创建: $name"
+# 经理类 - 继承Employee
+Object.method "Manager" "constructor" '
+    local name="$1" age="$2" company="$3" department="$4"
+    Employee.constructor "$this" "$name" "$age" "$company"
+    Object.attr "$this" "department" "$department"
+    Object.attr "$this" "position" "经理"
+    Object.attr "$this" "team" ""
+    echo "经理构造函数: department=\"$department\""
 '
 
-Object.method "Department" "addEmployee" '
+Object.method "Manager" "addToTeam" '
     local employee="$1"
-    local current_employees=$(Object.attr "$this" "employees")
-    Object.attr "$this" "employees" "$current_employees $employee"
-    echo "员工 $employee 加入部门 $(Object.attr "$this" "name")"
+    local current_team=$(Object.attr "$this" "team")
+    Object.attr "$this" "team" "$current_team $employee"
+    Object.addRelation "$this" "manages" "$employee"
+    Object.addRelation "$employee" "managed_by" "$this"
+    echo "经理 $(Object.attr "$this" "name") 添加 $employee 到团队"
 '
 
-Object.method "Department" "listEmployees" '
-    local employees=$(Object.attr "$this" "employees")
-    echo "部门 $(Object.attr "$this" "name") 的员工:"
-    for emp in $employees; do
-        local name=$(Object.attr "$emp" "name" 2>/dev/null || echo "未知")
-        echo "  - $emp ($name)"
+Object.method "Manager" "manageTeam" '
+    local name=$(Object.attr "$this" "name")
+    local department=$(Object.attr "$this" "department")
+    local team=$(Object.attr "$this" "team")
+    echo "经理 $name 正在管理 $department 部门:"
+    for member in $team; do
+        local member_name=$(Object.attr "$member" "name")
+        echo "  - 管理: $member ($member_name)"
     done
 '
 
-Object.method "Department" "workAll" '
-    local employees=$(Object.attr "$this" "employees")
-    echo "部门 $(Object.attr "$this" "name") 开始工作:"
-    for emp in $employees; do
-        if type "Employee.work" &>/dev/null; then
-            Employee.work "$emp"
-        fi
-    done
+# 继承Employee的方法
+Object.method "Manager" "work" 'Employee.work "$this"'
+Object.method "Manager" "getInfo" 'Employee.getInfo "$this"'
+
+# 日志观察者
+Object.method "Logger" "constructor" '
+    Object.attr "$this" "name" "$1"
+    echo "日志器创建: $1"
 '
 
-echo -e "\n=== 部门管理演示 ==="
-Object.create "Department" "dev_dept"
-Department.constructor "dev_dept" "开发部"
-
-# 创建更多员工
-Object.create "Employee" "emp2"
-Employee.constructor "emp2" "李工" "25" "科技公司"
-Employee.setSalary "emp2" "12000"
-
-Object.create "Employee" "emp3"  
-Employee.constructor "emp3" "王工" "30" "科技公司"
-Employee.setSalary "emp3" "18000"
-
-# 添加员工到部门
-Department.addEmployee "dev_dept" "emp1"
-Department.addEmployee "dev_dept" "emp2"
-Department.addEmployee "dev_dept" "emp3"
-
-Department.listEmployees "dev_dept"
-Department.workAll "dev_dept"
-
-echo -e "\n=== 反射功能演示 ==="
-
-Object.method "Object" "listMethods" '
-    local class=$(Object.attr "$this" "class")
-    echo "实例 $this 的方法:"
-    declare -F | grep "declare -f ${class}\." | sed "s/declare -f //"
+Object.method "Logger" "onEvent" '
+    local source="$1" event="$2" data="$3"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    local source_name=$(Object.attr "$source" "name" 2>/dev/null || echo "$source")
+    echo "[$timestamp] LOG: 来源=$source_name, 事件=$event, 数据=$data"
 '
 
-Object.method "Object" "listProperties" '
-    echo "实例 $this 的属性:"
-    for key in "${!OBJECT_PROPS[@]}"; do
-        if [[ "$key" == ${this}__* ]]; then
-            local prop_name="${key#${this}__}"
-            if [[ "$prop_name" != private__* ]]; then
-                echo "  - $prop_name: ${OBJECT_PROPS[$key]}"
-            fi
-        fi
-    done
+## 高级特性演示
+echo "=== 面向对象系统终极演示 ==="
+
+echo -e "\n=== 设计模式演示 ==="
+
+echo -e "\n1. 单例模式演示:"
+Object.singleton "Logger" "global_logger"
+Logger.constructor "global_logger" "全局日志器"
+
+echo -e "\n2. 观察者模式演示:"
+Object.create "Employee" "ceo"
+Employee.constructor "ceo" "张总裁" "45" "集团总部"
+Employee.promote "ceo" "CEO"
+
+Object.create "Logger" "hr_logger"
+Logger.constructor "hr_logger" "HR日志器"
+
+# 添加观察者
+Object.addObserver "ceo" "global_logger" "promotion"
+Object.addObserver "ceo" "hr_logger" "promotion"
+Object.addObserver "ceo" "global_logger" "work"
+
+echo -e "\n触发事件:"
+Employee.promote "ceo" "董事长"
+Employee.work "ceo"
+
+echo -e "\n=== 继承层次演示 ==="
+Object.create "Manager" "tech_manager"
+Manager.constructor "tech_manager" "李经理" "35" "科技公司" "技术部"
+
+Object.create "Employee" "dev1"
+Employee.constructor "dev1" "程序员A" "28" "科技公司"
+
+Object.create "Employee" "dev2"  
+Employee.constructor "dev2" "程序员B" "26" "科技公司"
+
+Manager.addToTeam "tech_manager" "dev1"
+Manager.addToTeam "tech_manager" "dev2"
+
+echo -e "\n经理信息:"
+Manager.getInfo "tech_manager"
+Manager.manageTeam "tech_manager"
+
+echo -e "\n团队成员信息:"
+Employee.getInfo "dev1"
+Employee.getInfo "dev2"
+
+echo -e "\n=== 关系管理演示 ==="
+echo "tech_manager 管理的员工: $(Object.getRelated "tech_manager" "manages")"
+echo "dev1 的经理: $(Object.getRelated "dev1" "managed_by")"
+
+echo -e "\n=== 工厂模式演示 ==="
+Object.static "Employee" "createDeveloper" '
+    local name="$1" age="$2" company="$3"
+    local instance="dev_${name}"
+    Object.create "Employee" "$instance"
+    Employee.constructor "$instance" "$name" "$age" "$company"
+    Object.attr "$instance" "position" "开发工程师"
+    Object.attr "$instance" "skills" "编程,调试,设计"
+    echo "创建开发人员: $instance"
+    echo "$instance"
 '
 
-echo -e "\n=== emp1 的反射信息 ==="
-Object.listMethods "emp1"
-Object.listProperties "emp1"
+Object.static "Employee" "createManager" '
+    local name="$1" age="$2" company="$3" department="$4"
+    local instance="mgr_${name}"
+    Object.create "Manager" "$instance"
+    Manager.constructor "$instance" "$name" "$age" "$company" "$department"
+    echo "创建经理: $instance"
+    echo "$instance"
+'
 
-echo -e "\n=== 改进的序列化演示 ==="
+echo -e "\n使用工厂方法创建对象:"
+dev3=$(Employee::createDeveloper "小王" "27" "科技公司")
+mgr2=$(Employee::createManager "赵总" "40" "科技公司" "产品部")
 
-Object.method "Object" "serialize" '
-    local file="${1:-${this}.data}"
-    echo "序列化对象 $this 到文件 $file"
+Employee.getInfo "$dev3"
+Manager.getInfo "$mgr2"
+
+echo -e "\n=== 装饰器模式演示 ==="
+Object.method "Employee" "decorateWithBonus" '
+    local bonus_rate="$1"
+    local original_work=$(declare -f Employee.work | tail -n +3)
+    original_work="${original_work%\\n*}"
+    
+    eval "
+        Employee.work() {
+            local this=\"\$1\"
+            local name=\$(Object.attr \"\$this\" \"name\")
+            echo \"\$name 获得 \$(echo \"\$bonus_rate * 100\" | bc)% 绩效奖金!\"
+            $original_work
+        }
+    "
+    echo "为 $this 添加奖金装饰器 (费率: $bonus_rate)"
+'
+
+echo -e "\n应用装饰器:"
+Employee.decorateWithBonus "dev1" "0.1"
+Employee.work "dev1"
+
+echo -e "\n=== 策略模式演示 ==="
+Object.method "SalaryCalculator" "calculate" '
+    local strategy="$1" employee="$2"
+    local base_salary=$(Object.attr "$employee" "salary")
+    
+    case $strategy in
+        "developer")
+            echo "$(echo "$base_salary * 1.2" | bc)"  # 增加20%
+            ;;
+        "manager")  
+            echo "$(echo "$base_salary * 1.5" | bc)"  # 增加50%
+            ;;
+        "ceo")
+            echo "$(echo "$base_salary * 2.0" | bc)"  # 增加100%
+            ;;
+        *)
+            echo "$base_salary"
+            ;;
+    esac
+'
+
+echo -e "\n策略模式计算工资:"
+Object.attr "dev1" "salary" "10000"
+Object.attr "tech_manager" "salary" "20000" 
+Object.attr "ceo" "salary" "50000"
+
+echo "开发人员工资: $(Object.attr "dev1" "salary") -> $(SalaryCalculator::calculate "developer" "dev1")"
+echo "经理工资: $(Object.attr "tech_manager" "salary") -> $(SalaryCalculator::calculate "manager" "tech_manager")"
+echo "CEO工资: $(Object.attr "ceo" "salary") -> $(SalaryCalculator::calculate "ceo" "ceo")"
+
+echo -e "\n=== 系统监控 ==="
+Object.static "Object" "systemInfo" '
+    echo "=== 系统信息 ==="
+    echo "对象总数: $(($(echo "${!OBJECT_PROPS[@]}" | tr ' ' '\n' | grep -c "__class") / 1))"
+    echo "属性总数: ${#OBJECT_PROPS[@]}"
+    echo "私有属性数: ${#OBJECT_PRIVATE[@]}"
+    echo "关系数量: ${#OBJECT_RELATIONS[@]}"
+    echo "定义的类: $(declare -F | grep -o "[a-zA-Z]*\." | sort -u | tr -d '.' | tr '\n' ' ')"
+    echo "总方法数: $(declare -F | wc -l)"
+'
+
+Object::systemInfo
+
+echo -e "\n=== 对象导出演示 ==="
+Object.method "Object" "exportToJSON" '
+    local file="${1:-${this}.json}"
+    echo "导出对象 $this 到 JSON: $file"
     {
-        echo "# 对象序列化数据: $this"
-        echo "# 类: $(Object.attr "$this" "class")"
+        echo "{"
+        echo "  \"object\": \"$this\","
+        echo "  \"class\": \"$(Object.attr "$this" "class")\","
+        echo "  \"properties\": {"
+        local first=true
         for key in "${!OBJECT_PROPS[@]}"; do
             if [[ "$key" == ${this}__* ]]; then
                 local prop_name="${key#${this}__}"
-                if [[ "$prop_name" != "class" && "$prop_name" != "created" ]]; then
-                    echo "PROP:${prop_name}=${OBJECT_PROPS[$key]}"
+                if [[ "$prop_name" != "class" && "$prop_name" != "created" && "$prop_name" != "id" ]]; then
+                    if [ "$first" = true ]; then
+                        first=false
+                    else
+                        echo ","
+                    fi
+                    local value="${OBJECT_PROPS[$key]}"
+                    echo -n "    \"$prop_name\": \"$value\""
                 fi
             fi
         done
+        echo ""
+        echo "  }"
+        echo "}"
     } > "$file"
-    echo "序列化完成"
+    echo "JSON导出完成"
 '
 
-Object.method "Object" "deserialize" '
-    local file="${1:-${this}.data}"
-    if [ ! -f "$file" ]; then
-        echo "文件不存在: $file"
-        return 1
-    fi
-    echo "从文件 $file 反序列化对象 $this"
-    local class=""
-    while IFS= read -r line; do
-        if [[ "$line" == "# 类: "* ]]; then
-            class="${line#\# 类: }"
-        elif [[ "$line" == PROP:* ]]; then
-            local key_value="${line#PROP:}"
-            local prop_name="${key_value%%=*}"
-            local value="${key_value#*=}"
-            Object.attr "$this" "$prop_name" "$value"
-        fi
-    done < "$file"
-    echo "反序列化完成 - 类: $class"
-'
-
-# 序列化测试
-echo "序列化 emp1..."
-Object.serialize "emp1" "emp1_backup.data"
-
-echo "创建新实例并反序列化..."
-Object.create "Employee" "emp1_restore"
-Object.deserialize "emp1_restore" "emp1_backup.data"
-
-echo "验证反序列化结果:"
-Employee.getInfo "emp1_restore"
-Employee.greet "emp1_restore"
-
-echo -e "\n=== 对象比较功能 ==="
-Object.method "Object" "equals" '
-    local other="$1"
-    local this_class=$(Object.attr "$this" "class")
-    local other_class=$(Object.attr "$other" "class")
-    
-    if [ "$this_class" != "$other_class" ]; then
-        echo "对象类型不同: $this_class vs $other_class"
-        return 1
-    fi
-    
-    # 比较属性
-    local this_name=$(Object.attr "$this" "name")
-    local other_name=$(Object.attr "$other" "name")
-    local this_age=$(Object.attr "$this" "age")  
-    local other_age=$(Object.attr "$other" "age")
-    
-    if [ "$this_name" = "$other_name" ] && [ "$this_age" = "$other_age" ]; then
-        echo "对象内容相同"
-        return 0
-    else
-        echo "对象内容不同"
-        return 1
-    fi
-'
-
-echo "比较 emp1 和 emp1_restore:"
-Object.equals "emp1" "emp1_restore"
-
-echo -e "\n=== 系统统计 ==="
-echo "总对象数量: $(($(echo "${!OBJECT_PROPS[@]}" | tr ' ' '\n' | grep -c "__class") / 1))"
-echo "总属性数量: ${#OBJECT_PROPS[@]}"
-echo "总私有属性数量: ${#OBJECT_PRIVATE[@]}"
-
-echo -e "\n=== 内存使用情况 ==="
-echo "OBJECT_PROPS 大小: ${#OBJECT_PROPS[@]} 个属性"
-echo "OBJECT_PRIVATE 大小: ${#OBJECT_PRIVATE[@]} 个属性"
-echo "定义的方法数量: $(declare -F | grep -c "\.()")"
+Object.exportToJSON "ceo" "ceo_data.json"
+echo "查看导出文件: cat ceo_data.json"
 
 echo -e "\n=== 演示完成 ==="
