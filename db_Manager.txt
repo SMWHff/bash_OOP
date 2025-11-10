@@ -1,0 +1,5 @@
+#OBJECT_START mgr1 2025-11-10 15:20:12
+PROP:team_size=10
+PROP:name=陈经理
+PROP:budget=500000
+#OBJECT_END mgr1
