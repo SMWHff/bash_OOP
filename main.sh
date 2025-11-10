@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# 面向对象系统 - 终极版
+# 面向对象系统 - 修复版
 declare -A OBJECT_PROPS
 declare -A OBJECT_PRIVATE
 declare -A CLASS_METHODS
-declare -A OBJECT_RELATIONS  # 对象关系存储
+declare -A OBJECT_RELATIONS
 
 Object() {
     : # 基类
@@ -137,7 +137,7 @@ Object.method "Person" "constructor" '
     echo "构造函数: name=\"$name\", age=\"$age\""
     Object.attr "$this" "name" "$name"
     Object.attr "$this" "age" "$age"
-    Object.private "$this" "secret" "$(date +%s | md5sum | head -c 8)"
+    Object.private "$this" "secret" "$(date +%s | md5sum | head -c 8 2>/dev/null || echo "secret")"
 '
 
 Object.method "Person" "greet" '
@@ -231,14 +231,99 @@ Object.method "Logger" "onEvent" '
     echo "[$timestamp] LOG: 来源=$source_name, 事件=$event, 数据=$data"
 '
 
+## 修复工厂模式
+Object.static "Employee" "createDeveloper" '
+    local name="$1" age="$2" company="$3"
+    local instance="dev_${name}_$(date +%s)"
+    Object.create "Employee" "$instance"
+    Employee.constructor "$instance" "$name" "$age" "$company"
+    Object.attr "$instance" "position" "开发工程师"
+    Object.attr "$instance" "skills" "编程,调试,设计"
+    echo "创建开发人员: $instance"
+    echo "$instance"
+'
+
+Object.static "Employee" "createManager" '
+    local name="$1" age="$2" company="$3" department="$4"
+    local instance="mgr_${name}_$(date +%s)"
+    Object.create "Manager" "$instance"
+    Manager.constructor "$instance" "$name" "$age" "$company" "$department"
+    echo "创建经理: $instance"
+    echo "$instance"
+'
+
+## 修复装饰器模式 - 使用更简单的方法
+Object.method "Employee" "addBonus" '
+    local bonus_rate="$1"
+    # 保存原始work方法
+    local original_work="employee_work_$this"
+    eval "
+        $original_work() {
+            Employee.work \"\$1\"
+        }
+    "
+    # 创建新的work方法
+    eval "
+        Employee.work() {
+            local this=\"\$1\"
+            local name=\$(Object.attr \"\$this\" \"name\")
+            local bonus_percent=\$(echo \"$bonus_rate * 100\" | bc 2>/dev/null || echo \"10\")
+            echo \"\$name 获得 \$bonus_percent% 绩效奖金!\"
+            $original_work \"\$this\"
+        }
+    "
+    echo "为 $this 添加奖金装饰器 (费率: $bonus_rate)"
+'
+
+## 修复策略模式 - 使用普通函数
+SalaryCalculator::calculate() {
+    local strategy="$1" employee="$2"
+    local base_salary=$(Object.attr "$employee" "salary")
+    
+    case $strategy in
+        "developer")
+            echo $(($base_salary * 12 / 10))  # 增加20%
+            ;;
+        "manager")  
+            echo $(($base_salary * 15 / 10))  # 增加50%
+            ;;
+        "ceo")
+            echo $(($base_salary * 2))  # 增加100%
+            ;;
+        *)
+            echo "$base_salary"
+            ;;
+    esac
+}
+
+## 修复系统监控
+Object.static "Object" "systemInfo" '
+    echo "=== 系统信息 ==="
+    local object_count=0
+    for key in "${!OBJECT_PROPS[@]}"; do
+        if [[ "$key" == *"__class" ]]; then
+            ((object_count++))
+        fi
+    done
+    echo "对象总数: $object_count"
+    echo "属性总数: ${#OBJECT_PROPS[@]}"
+    echo "私有属性数: ${#OBJECT_PRIVATE[@]}"
+    echo "关系数量: ${#OBJECT_RELATIONS[@]}"
+    
+    echo -n "定义的类: "
+    declare -F | grep -oE "[a-zA-Z_][a-zA-Z0-9_]*\." | sort -u | tr -d '.' | tr '\n' ' '
+    echo ""
+    echo "总方法数: $(declare -F | wc -l)"
+'
+
 ## 高级特性演示
-echo "=== 面向对象系统终极演示 ==="
+echo "=== 面向对象系统修复演示 ==="
 
 echo -e "\n=== 设计模式演示 ==="
 
 echo -e "\n1. 单例模式演示:"
-Object.singleton "Logger" "global_logger"
-Logger.constructor "global_logger" "全局日志器"
+logger_instance=$(Object.singleton "Logger" "global_logger")
+Logger.constructor "$logger_instance" "全局日志器"
 
 echo -e "\n2. 观察者模式演示:"
 Object.create "Employee" "ceo"
@@ -282,77 +367,21 @@ echo -e "\n=== 关系管理演示 ==="
 echo "tech_manager 管理的员工: $(Object.getRelated "tech_manager" "manages")"
 echo "dev1 的经理: $(Object.getRelated "dev1" "managed_by")"
 
-echo -e "\n=== 工厂模式演示 ==="
-Object.static "Employee" "createDeveloper" '
-    local name="$1" age="$2" company="$3"
-    local instance="dev_${name}"
-    Object.create "Employee" "$instance"
-    Employee.constructor "$instance" "$name" "$age" "$company"
-    Object.attr "$instance" "position" "开发工程师"
-    Object.attr "$instance" "skills" "编程,调试,设计"
-    echo "创建开发人员: $instance"
-    echo "$instance"
-'
-
-Object.static "Employee" "createManager" '
-    local name="$1" age="$2" company="$3" department="$4"
-    local instance="mgr_${name}"
-    Object.create "Manager" "$instance"
-    Manager.constructor "$instance" "$name" "$age" "$company" "$department"
-    echo "创建经理: $instance"
-    echo "$instance"
-'
-
-echo -e "\n使用工厂方法创建对象:"
+echo -e "\n=== 修复的工厂模式演示 ==="
+echo "使用工厂方法创建对象:"
 dev3=$(Employee::createDeveloper "小王" "27" "科技公司")
 mgr2=$(Employee::createManager "赵总" "40" "科技公司" "产品部")
 
 Employee.getInfo "$dev3"
 Manager.getInfo "$mgr2"
 
-echo -e "\n=== 装饰器模式演示 ==="
-Object.method "Employee" "decorateWithBonus" '
-    local bonus_rate="$1"
-    local original_work=$(declare -f Employee.work | tail -n +3)
-    original_work="${original_work%\\n*}"
-    
-    eval "
-        Employee.work() {
-            local this=\"\$1\"
-            local name=\$(Object.attr \"\$this\" \"name\")
-            echo \"\$name 获得 \$(echo \"\$bonus_rate * 100\" | bc)% 绩效奖金!\"
-            $original_work
-        }
-    "
-    echo "为 $this 添加奖金装饰器 (费率: $bonus_rate)"
-'
-
-echo -e "\n应用装饰器:"
-Employee.decorateWithBonus "dev1" "0.1"
+echo -e "\n=== 修复的装饰器模式演示 ==="
+echo "应用装饰器:"
+Employee.addBonus "dev1" "0.1"
 Employee.work "dev1"
 
-echo -e "\n=== 策略模式演示 ==="
-Object.method "SalaryCalculator" "calculate" '
-    local strategy="$1" employee="$2"
-    local base_salary=$(Object.attr "$employee" "salary")
-    
-    case $strategy in
-        "developer")
-            echo "$(echo "$base_salary * 1.2" | bc)"  # 增加20%
-            ;;
-        "manager")  
-            echo "$(echo "$base_salary * 1.5" | bc)"  # 增加50%
-            ;;
-        "ceo")
-            echo "$(echo "$base_salary * 2.0" | bc)"  # 增加100%
-            ;;
-        *)
-            echo "$base_salary"
-            ;;
-    esac
-'
-
-echo -e "\n策略模式计算工资:"
+echo -e "\n=== 修复的策略模式演示 ==="
+echo "策略模式计算工资:"
 Object.attr "dev1" "salary" "10000"
 Object.attr "tech_manager" "salary" "20000" 
 Object.attr "ceo" "salary" "50000"
@@ -361,17 +390,7 @@ echo "开发人员工资: $(Object.attr "dev1" "salary") -> $(SalaryCalculator::
 echo "经理工资: $(Object.attr "tech_manager" "salary") -> $(SalaryCalculator::calculate "manager" "tech_manager")"
 echo "CEO工资: $(Object.attr "ceo" "salary") -> $(SalaryCalculator::calculate "ceo" "ceo")"
 
-echo -e "\n=== 系统监控 ==="
-Object.static "Object" "systemInfo" '
-    echo "=== 系统信息 ==="
-    echo "对象总数: $(($(echo "${!OBJECT_PROPS[@]}" | tr ' ' '\n' | grep -c "__class") / 1))"
-    echo "属性总数: ${#OBJECT_PROPS[@]}"
-    echo "私有属性数: ${#OBJECT_PRIVATE[@]}"
-    echo "关系数量: ${#OBJECT_RELATIONS[@]}"
-    echo "定义的类: $(declare -F | grep -o "[a-zA-Z]*\." | sort -u | tr -d '.' | tr '\n' ' ')"
-    echo "总方法数: $(declare -F | wc -l)"
-'
-
+echo -e "\n=== 修复的系统监控 ==="
 Object::systemInfo
 
 echo -e "\n=== 对象导出演示 ==="
@@ -406,6 +425,24 @@ Object.method "Object" "exportToJSON" '
 '
 
 Object.exportToJSON "ceo" "ceo_data.json"
-echo "查看导出文件: cat ceo_data.json"
+echo "查看导出文件内容:"
+cat ceo_data.json
+
+echo -e "\n=== 性能测试 ==="
+Object.static "Object" "performanceTest" '
+    echo "性能测试 - 创建100个简单对象:"
+    local start_time=$(date +%s%N)
+    
+    for i in {1..10}; do
+        Object.create "Person" "test_obj_$i"
+        Person.constructor "test_obj_$i" "Test$i" "$((20 + i))"
+    done
+    
+    local end_time=$(date +%s%N)
+    local duration=$(( (end_time - start_time) / 1000000 ))
+    echo "创建10个对象耗时: ${duration}ms"
+'
+
+Object::performanceTest
 
 echo -e "\n=== 演示完成 ==="
