@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 面向对象系统 - 最终修复版
+# 面向对象系统 - 继承修复版
 declare -A OBJECT_PROPS
 
 Object() {
@@ -39,7 +39,7 @@ Object.method() {
     "
 }
 
-# 定义 Person 类的方法 - 使用正确的语法
+# 定义 Person 类的方法
 Object.method "Person" "constructor" '
     local name="$1"
     local age="$2"
@@ -114,7 +114,7 @@ Person.introduce "person1"
 Person.introduce "person2"
 
 echo -e "\n=== 继承演示 ==="
-# 创建 Student 类继承 Person
+# 创建 Student 类继承 Person - 手动复制父类方法
 Object.method "Student" "constructor" '
     local name="$1"
     local age="$2"
@@ -130,13 +130,21 @@ Object.method "Student" "study" '
     echo "$name 正在学习..."
 '
 
+# 手动为Student类添加Person的方法（模拟继承）
+Object.method "Student" "greet" 'Person.greet "$this"'
+Object.method "Student" "birthday" 'Person.birthday "$this"'
+Object.method "Student" "introduce" 'Person.introduce "$this"'
+Object.method "Student" "setJob" 'Person.setJob "$this" "$@"'
+
 # 创建学生实例
 Object.create "Student" "student1"
 Student.constructor "student1" "Charlie" "20" "S12345"
-Student.greet "student1"  # 继承自Person的方法
+echo -e "\n=== 调用继承的方法 ==="
+Student.greet "student1"
 Student.study "student1"
 
 echo -e "\n=== 多态演示 ==="
+# 重写Student的greet方法
 Object.method "Student" "greet" '
     local name=$(Object.attr "$this" "name")
     local age=$(Object.attr "$this" "age")
@@ -146,6 +154,12 @@ Object.method "Student" "greet" '
 
 echo "重写greet方法后:"
 Student.greet "student1"
+
+echo -e "\n=== 调用其他继承方法 ==="
+Student.setJob "student1" "学生"
+Student.introduce "student1"
+Student.birthday "student1"
+Student.introduce "student1"
 
 echo -e "\n=== 内存管理演示 ==="
 Object.method "Person" "destroy" '
@@ -159,6 +173,17 @@ Object.method "Person" "destroy" '
     echo "对象 $this 已被销毁"
 '
 
+# 也为Student添加destroy方法
+Object.method "Student" "destroy" 'Person.destroy "$this"'
+
 Person.destroy "person2"
 echo "person2销毁后属性:"
 Object.attr "person2" "name" 2>/dev/null || echo "属性不存在"
+
+echo -e "\n=== 类信息查询 ==="
+Object.method "Object" "getClass" '
+    echo "${OBJECT_PROPS["${this}__class"]}"
+'
+
+echo "student1的类是: $(Object.getClass "student1")"
+echo "person1的类是: $(Object.getClass "person1")"
