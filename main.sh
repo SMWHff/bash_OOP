@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 面向对象系统 - 高级扩展版
+# 面向对象系统 - 修复完善版
 declare -A OBJECT_PROPS
 declare -A OBJECT_PRIVATE  # 私有属性存储
 declare -A CLASS_METHODS   # 类方法存储
@@ -99,7 +99,7 @@ Object.method "Person" "constructor" '
     echo "构造函数: name=\"$name\", age=\"$age\""
     Object.attr "$this" "name" "$name"
     Object.attr "$this" "age" "$age"
-    Object.private "$this" "secret" "$(uuidgen 2>/dev/null || echo "secret-$(date +%s)")"
+    Object.private "$this" "secret" "$(date +%s | md5sum | head -c 8)"
 '
 
 Object.method "Person" "greet" '
@@ -133,7 +133,7 @@ Object.method "Person" "setJob" '
 
 Object.method "Person" "getSecret" '
     local secret=$(Object.private "$this" "secret")
-    echo "我的秘密ID: $secret"
+    echo "我的秘密ID: ${secret:-未设置}"
 '
 
 # Person 类方法（静态方法）
@@ -186,13 +186,19 @@ Object.method "Employee" "getInfo" '
     echo "员工信息: 姓名=$name, 公司=$company, 工资=$salary"
 '
 
-# 手动继承Person的方法
+# 手动继承Person的方法 - 修复继承链
 Object.method "Employee" "greet" 'Person.greet "$this"'
 Object.method "Employee" "birthday" 'Person.birthday "$this"'
 Object.method "Employee" "introduce" 'Person.introduce "$this"'
+Object.method "Employee" "setJob" 'Person.setJob "$this" "$@"'
+Object.method "Employee" "getSecret" 'Person.getSecret "$this"'
 
 ## 使用示例
 echo "=== 面向对象系统高级演示 ==="
+
+echo -e "\n=== 基础对象创建 ==="
+Object.create "Person" "person1"
+Person.constructor "person1" "Alice" "25"
 
 echo -e "\n=== 类方法演示 ==="
 Person::getSpecies
@@ -299,21 +305,20 @@ echo -e "\n=== emp1 的反射信息 ==="
 Object.listMethods "emp1"
 Object.listProperties "emp1"
 
-echo -e "\n=== 序列化演示 ==="
+echo -e "\n=== 改进的序列化演示 ==="
 
 Object.method "Object" "serialize" '
     local file="${1:-${this}.data}"
     echo "序列化对象 $this 到文件 $file"
     {
         echo "# 对象序列化数据: $this"
+        echo "# 类: $(Object.attr "$this" "class")"
         for key in "${!OBJECT_PROPS[@]}"; do
             if [[ "$key" == ${this}__* ]]; then
-                echo "PROP:${key}=${OBJECT_PROPS[$key]}"
-            fi
-        done
-        for key in "${!OBJECT_PRIVATE[@]}"; do
-            if [[ "$key" == ${this}__* ]]; then
-                echo "PRIVATE:${key}=${OBJECT_PRIVATE[$key]}"
+                local prop_name="${key#${this}__}"
+                if [[ "$prop_name" != "class" && "$prop_name" != "created" ]]; then
+                    echo "PROP:${prop_name}=${OBJECT_PROPS[$key]}"
+                fi
             fi
         done
     } > "$file"
@@ -327,29 +332,69 @@ Object.method "Object" "deserialize" '
         return 1
     fi
     echo "从文件 $file 反序列化对象 $this"
+    local class=""
     while IFS= read -r line; do
-        if [[ "$line" == PROP:* ]]; then
+        if [[ "$line" == "# 类: "* ]]; then
+            class="${line#\# 类: }"
+        elif [[ "$line" == PROP:* ]]; then
             local key_value="${line#PROP:}"
-            local key="${key_value%%=*}"
+            local prop_name="${key_value%%=*}"
             local value="${key_value#*=}"
-            OBJECT_PROPS["$key"]="$value"
-        elif [[ "$line" == PRIVATE:* ]]; then
-            local key_value="${line#PRIVATE:}"
-            local key="${key_value%%=*}"
-            local value="${key_value#*=}"
-            OBJECT_PRIVATE["$key"]="$value"
+            Object.attr "$this" "$prop_name" "$value"
         fi
     done < "$file"
-    echo "反序列化完成"
+    echo "反序列化完成 - 类: $class"
 '
 
 # 序列化测试
+echo "序列化 emp1..."
 Object.serialize "emp1" "emp1_backup.data"
+
+echo "创建新实例并反序列化..."
 Object.create "Employee" "emp1_restore"
 Object.deserialize "emp1_restore" "emp1_backup.data"
+
+echo "验证反序列化结果:"
 Employee.getInfo "emp1_restore"
+Employee.greet "emp1_restore"
+
+echo -e "\n=== 对象比较功能 ==="
+Object.method "Object" "equals" '
+    local other="$1"
+    local this_class=$(Object.attr "$this" "class")
+    local other_class=$(Object.attr "$other" "class")
+    
+    if [ "$this_class" != "$other_class" ]; then
+        echo "对象类型不同: $this_class vs $other_class"
+        return 1
+    fi
+    
+    # 比较属性
+    local this_name=$(Object.attr "$this" "name")
+    local other_name=$(Object.attr "$other" "name")
+    local this_age=$(Object.attr "$this" "age")  
+    local other_age=$(Object.attr "$other" "age")
+    
+    if [ "$this_name" = "$other_name" ] && [ "$this_age" = "$other_age" ]; then
+        echo "对象内容相同"
+        return 0
+    else
+        echo "对象内容不同"
+        return 1
+    fi
+'
+
+echo "比较 emp1 和 emp1_restore:"
+Object.equals "emp1" "emp1_restore"
 
 echo -e "\n=== 系统统计 ==="
 echo "总对象数量: $(($(echo "${!OBJECT_PROPS[@]}" | tr ' ' '\n' | grep -c "__class") / 1))"
 echo "总属性数量: ${#OBJECT_PROPS[@]}"
 echo "总私有属性数量: ${#OBJECT_PRIVATE[@]}"
+
+echo -e "\n=== 内存使用情况 ==="
+echo "OBJECT_PROPS 大小: ${#OBJECT_PROPS[@]} 个属性"
+echo "OBJECT_PRIVATE 大小: ${#OBJECT_PRIVATE[@]} 个属性"
+echo "定义的方法数量: $(declare -F | grep -c "\.()")"
+
+echo -e "\n=== 演示完成 ==="
