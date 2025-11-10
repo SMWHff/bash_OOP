@@ -132,7 +132,7 @@ Object.method "Object" "setAttrWithValidation" '
     fi
 '
 
-# 修复数据库持久化 - 在原有代码基础上修改
+# 数据库持久化 - 完整修复版本
 Object.static "Object" "saveToDB" '
     local instance="$1"
     local class=$(Object.attr "$instance" "class")
@@ -143,20 +143,26 @@ Object.static "Object" "saveToDB" '
     # 模拟数据库表
     local db_file="db_${class}.txt"
     {
-        echo "# $instance - $(date)"
+        echo "#OBJECT_START $instance $(date "+%Y-%m-%d %H:%M:%S")"
         for key in "${!OBJECT_PROPS[@]}"; do
             if [[ "$key" == ${instance}__* ]]; then
                 local prop_name="${key#${instance}__}"
                 # 跳过系统属性
                 if [[ "$prop_name" != "class" && "$prop_name" != "created" && "$prop_name" != "id" ]]; then
-                    echo "${prop_name}=${OBJECT_PROPS[$key]}"
+                    local value="${OBJECT_PROPS[$key]}"
+                    # 对值进行编码，处理特殊字符
+                    value="${value//$'\n'/\\n}"
+                    value="${value//$'\r'/\\r}"
+                    echo "PROP:${prop_name}=${value}"
                 fi
             fi
         done
-        echo "---"
-    } > "$db_file"  # 使用 > 而不是 >> 避免重复追加
+        echo "#OBJECT_END $instance"
+    } > "$db_file"
     
     echo "保存完成: $db_file"
+    echo "保存的属性:"
+    grep "^PROP:" "$db_file" | sed 's/^PROP://'
 '
 
 Object.static "Object" "loadFromDB" '
@@ -171,28 +177,80 @@ Object.static "Object" "loadFromDB" '
     echo "从数据库加载对象: $instance (类: $class)"
     Object.create "$class" "$instance"
     
-    # 查找实例的数据块
-    local in_block=0
+    local in_object=0
     while IFS= read -r line; do
-        if [[ "$line" == "# $instance - "* ]]; then
-            in_block=1
+        # 检查对象开始标记
+        if [[ "$line" == "#OBJECT_START $instance "* ]]; then
+            in_object=1
             continue
         fi
-        if [ "$in_block" -eq 1 ]; then
-            if [[ "$line" == "---" ]]; then
-                break
-            fi
-            # 解析属性行
-            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
-                local prop_name="${BASH_REMATCH[1]}"
-                local value="${BASH_REMATCH[2]}"
-                Object.attr "$instance" "$prop_name" "$value"
-                echo "加载属性: $prop_name = $value"
-            fi
+        
+        # 检查对象结束标记
+        if [[ "$line" == "#OBJECT_END $instance" ]]; then
+            break
+        fi
+        
+        # 处理属性行
+        if [ "$in_object" -eq 1 ] && [[ "$line" == PROP:* ]]; then
+            local prop_line="${line#PROP:}"
+            local prop_name="${prop_line%%=*}"
+            local value="${prop_line#*=}"
+            # 解码特殊字符
+            value="${value//\\n/$'\n'}"
+            value="${value//\\r/$'\r'}"
+            
+            Object.attr "$instance" "$prop_name" "$value"
+            echo "加载属性: $prop_name = $value"
         fi
     done < "$db_file"
     
-    echo "加载完成: $instance"
+    if [ "$in_object" -eq 0 ]; then
+        echo "警告: 在数据库中未找到对象 $instance 的数据"
+    else
+        echo "加载完成: $instance"
+    fi
+'
+
+# 添加对象销毁方法
+Object.method "Object" "destroy" '
+    echo "销毁对象: $this"
+    
+    # 删除对象的所有属性
+    for key in "${!OBJECT_PROPS[@]}"; do
+        if [[ "$key" == ${this}__* ]]; then
+            unset OBJECT_PROPS["$key"]
+        fi
+    done
+    
+    # 删除对象的私有属性
+    for key in "${!OBJECT_PRIVATE[@]}"; do
+        if [[ "$key" == ${this}__* ]]; then
+            unset OBJECT_PRIVATE["$key"]
+        fi
+    done
+    
+    # 删除对象的关系
+    for key in "${!OBJECT_RELATIONS[@]}"; do
+        if [[ "$key" == ${this}__* ]]; then
+            unset OBJECT_RELATIONS["$key"]
+        fi
+    done
+    
+    # 删除对象的事件
+    for key in "${!OBJECT_EVENTS[@]}"; do
+        if [[ "$key" == ${this}__* ]]; then
+            unset OBJECT_EVENTS["$key"]
+        fi
+    done
+    
+    # 删除对象的验证器
+    for key in "${!OBJECT_VALIDATORS[@]}"; do
+        if [[ "$key" == ${this}__* ]]; then
+            unset OBJECT_VALIDATORS["$key"]
+        fi
+    done
+    
+    echo "对象 $this 已完全销毁"
 '
 
 # 添加缓存系统
