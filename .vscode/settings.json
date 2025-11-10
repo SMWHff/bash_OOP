@@ -1,6 +1,7 @@
 {
     "shellcheck.exclude": [
         "SC2016",
-        "SC2155"
+        "SC2155",
+        "SC1091"
     ]
 }

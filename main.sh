@@ -179,14 +179,14 @@ Object.static "Object" "loadFromDB" '
     
     local in_object=0
     while IFS= read -r line; do
-        # 检查对象开始标记
-        if [[ "$line" == "#OBJECT_START $instance "* ]]; then
+        # 检查对象开始标记 - 不再检查实例名，遇到第一个对象就开始
+        if [[ "$line" == "#OBJECT_START "* ]]; then
             in_object=1
             continue
         fi
         
         # 检查对象结束标记
-        if [[ "$line" == "#OBJECT_END $instance" ]]; then
+        if [[ "$line" == "#OBJECT_END "* ]]; then
             break
         fi
         
@@ -205,7 +205,7 @@ Object.static "Object" "loadFromDB" '
     done < "$db_file"
     
     if [ "$in_object" -eq 0 ]; then
-        echo "警告: 在数据库中未找到对象 $instance 的数据"
+        echo "警告: 在数据库中未找到对象数据"
     else
         echo "加载完成: $instance"
     fi
@@ -261,7 +261,7 @@ Object.static "Object" "cacheSet" '
     local expire_time=$(( $(date +%s) + ttl ))
     OBJECT_CACHE["${key}__value"]="$value"
     OBJECT_CACHE["${key}__expire"]="$expire_time"
-    echo "缓存设置: $key -> $value (TTL: ${ttl}s)"
+    echo "缓存设置: $key -> $value (TTL: ${ttl}s)" >&2
 '
 
 Object.static "Object" "cacheGet" '
@@ -271,11 +271,11 @@ Object.static "Object" "cacheGet" '
     local current_time=$(date +%s)
     
     if [ -n "$value" ] && [ "$current_time" -lt "$expire" ]; then
-        echo "缓存命中: $key -> $value"
+        echo "缓存命中: $key -> $value" >&2
         echo "$value"
         return 0
     else
-        echo "缓存未命中: $key"
+        echo "缓存未命中: $key" >&2
         return 1
     fi
 '
