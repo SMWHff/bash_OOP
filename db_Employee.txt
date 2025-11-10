@@ -1,8 +1,0 @@
-#OBJECT_START db_emp 2025-11-10 12:12:15
-PROP:position=数据工程师
-PROP:name=数据库员工
-PROP:age=40
-PROP:company=数据公司
-PROP:permissions__employee= read work
-PROP:salary=75000
-#OBJECT_END db_emp
