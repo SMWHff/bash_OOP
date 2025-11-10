@@ -132,7 +132,7 @@ Object.method "Object" "setAttrWithValidation" '
     fi
 '
 
-# 数据库模拟
+# 修复数据库持久化 - 在原有代码基础上修改
 Object.static "Object" "saveToDB" '
     local instance="$1"
     local class=$(Object.attr "$instance" "class")
@@ -147,11 +147,14 @@ Object.static "Object" "saveToDB" '
         for key in "${!OBJECT_PROPS[@]}"; do
             if [[ "$key" == ${instance}__* ]]; then
                 local prop_name="${key#${instance}__}"
-                echo "${prop_name}=${OBJECT_PROPS[$key]}"
+                # 跳过系统属性
+                if [[ "$prop_name" != "class" && "$prop_name" != "created" && "$prop_name" != "id" ]]; then
+                    echo "${prop_name}=${OBJECT_PROPS[$key]}"
+                fi
             fi
         done
         echo "---"
-    } >> "$db_file"
+    } > "$db_file"  # 使用 > 而不是 >> 避免重复追加
     
     echo "保存完成: $db_file"
 '
@@ -168,11 +171,26 @@ Object.static "Object" "loadFromDB" '
     echo "从数据库加载对象: $instance (类: $class)"
     Object.create "$class" "$instance"
     
-    while IFS='=' read -r prop_name value; do
-        if [[ "$prop_name" != "#"* && "$prop_name" != "---" && -n "$prop_name" ]]; then
-            Object.attr "$instance" "$prop_name" "$value"
+    # 查找实例的数据块
+    local in_block=0
+    while IFS= read -r line; do
+        if [[ "$line" == "# $instance - "* ]]; then
+            in_block=1
+            continue
         fi
-    done < <(grep -A 100 "^# $instance" "$db_file" | head -n 10)
+        if [ "$in_block" -eq 1 ]; then
+            if [[ "$line" == "---" ]]; then
+                break
+            fi
+            # 解析属性行
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                local prop_name="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+                Object.attr "$instance" "$prop_name" "$value"
+                echo "加载属性: $prop_name = $value"
+            fi
+        fi
+    done < "$db_file"
     
     echo "加载完成: $instance"
 '
