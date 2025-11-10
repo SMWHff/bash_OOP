@@ -21,10 +21,16 @@ Object.create() {
     OBJECT_PROPS["${instance}__id"]="obj_$(date +%s)_$RANDOM"
 }
 
-# 属性管理
+# 修复 Object.attr 方法，添加销毁检查
 Object.attr() {
     local instance=$1 attr=$2
     local key="${instance}__${attr}"
+    
+    # 检查对象是否已销毁
+    if [ -n "${OBJECT_PROPS[${instance}__destroyed]}" ]; then
+        echo "错误: 对象 $instance 已被销毁" >&2
+        return 1
+    fi
     
     if [ $# -eq 3 ]; then
         OBJECT_PROPS["$key"]="$3"
@@ -81,6 +87,7 @@ Object.method "Object" "on" '
     echo "注册事件处理器: $this -> $event"
 '
 
+# 修复 Object.emit 方法
 Object.method "Object" "emit" '
     local event="$1"
     shift
@@ -90,7 +97,8 @@ Object.method "Object" "emit" '
     echo "触发事件: $event, 参数: $@"
     for handler in $handlers; do
         if type "$handler" &>/dev/null; then
-            $handler "$this" "$@"
+            # 修复：正确传递所有参数
+            $handler "$this" "$event" "$@"
         fi
     done
 '
@@ -140,7 +148,6 @@ Object.static "Object" "saveToDB" '
     
     echo "保存对象到数据库: $instance (类: $class, ID: $id)"
     
-    # 使用实例名作为文件名的一部分，避免冲突
     local db_file="db_${class}_${instance}.txt"
     
     # 保存对象数据
@@ -150,12 +157,14 @@ Object.static "Object" "saveToDB" '
             if [[ "$key" == ${instance}__* ]]; then
                 local prop_name="${key#${instance}__}"
                 # 跳过系统属性
-                if [[ "$prop_name" != "class" && "$prop_name" != "created" && "$prop_name" != "id" ]]; then
+                if [[ "$prop_name" != "class" && "$prop_name" != "created" && "$prop_name" != "id" && "$prop_name" != "__transaction_backup" && "$prop_name" != "destroyed" ]]; then
                     local value="${OBJECT_PROPS[$key]}"
-                    # 对值进行编码，处理特殊字符
-                    value="${value//$'\n'/\\n}"
-                    value="${value//$'\r'/\\r}"
-                    value="${value//$'='/\\=}"
+                    # 增强特殊字符编码
+                    value="${value//$'\n'/\\\\n}"
+                    value="${value//$'\r'/\\\\r}"
+                    value="${value//$'='/\\\\=}"
+                    value="${value//$'\&'/\\\\&}"
+                    value="${value//$'\|'/\\\\|}"
                     echo "PROP:${prop_name}=${value}"
                 fi
             fi
@@ -164,8 +173,6 @@ Object.static "Object" "saveToDB" '
     } > "$db_file"
     
     echo "保存完成: $db_file"
-    echo "保存的属性:"
-    grep "^PROP:" "$db_file" | sed 's/^PROP://'
 '
 
 # 修复数据库加载函数
@@ -241,9 +248,31 @@ Object.static "Object" "cleanupDB" '
     echo "数据库清理完成"
 '
 
-# 添加对象销毁方法
+# 添加系统级清理方法
+Object.static "Object" "cleanup" '
+    echo "=== 系统清理 ==="
+    local object_count=0
+    for key in "${!OBJECT_PROPS[@]}"; do
+        if [[ "$key" == *"__class" ]]; then
+            local instance="${key%__class}"
+            echo "清理对象: $instance"
+            Object.destroy "$instance"
+            ((object_count++))
+        fi
+    done
+    
+    # 清理缓存
+    OBJECT_CACHE=()
+    echo "缓存已清空"
+    echo "系统清理完成: 共清理 $object_count 个对象"
+'
+
+# 修复 Object.destroy 方法
 Object.method "Object" "destroy" '
     echo "销毁对象: $this"
+    
+    # 标记对象为已销毁
+    OBJECT_PROPS["${this}__destroyed"]="true"
     
     # 删除对象的所有属性
     for key in "${!OBJECT_PROPS[@]}"; do
@@ -374,14 +403,17 @@ Object.method "Object" "checkPermission" '
 # 添加事务支持
 Object.method "Object" "beginTransaction" '
     echo "开始事务: $this"
-    Object.attr "$this" "__transaction_backup" "$(mktemp)"
+    # 修复：使用绝对路径或更安全的临时文件创建
+    local backup_file=$(mktemp "/tmp/object_tx_${this}_XXXXXX")
+    Object.attr "$this" "__transaction_backup" "$backup_file"
     
     # 备份当前状态
     for key in "${!OBJECT_PROPS[@]}"; do
         if [[ "$key" == ${this}__* ]]; then
-            echo "$key=${OBJECT_PROPS[$key]}" >> $(Object.attr "$this" "__transaction_backup")
+            echo "$key=${OBJECT_PROPS[$key]}" >> "$backup_file"
         fi
     done
+    echo "事务备份已创建: $backup_file"
 '
 
 Object.method "Object" "commitTransaction" '
