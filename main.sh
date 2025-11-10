@@ -477,222 +477,222 @@ attr_change_handler() {
     echo "[$timestamp] 属性变更: $instance.$attr = $value"
 }
 
-## 企业级功能演示
-echo "=== Bash 面向对象系统 - 企业级扩展演示 ==="
+# ## 企业级功能演示
+# echo "=== Bash 面向对象系统 - 企业级扩展演示 ==="
 
-echo -e "\n=== 配置管理 ==="
-# 创建配置文件
-cat > app.conf << 'EOF'
-# 应用配置
-database.host=localhost
-database.port=5432
-app.name=BashOOP系统
-app.version=1.0.0
-log.level=INFO
-EOF
+# echo -e "\n=== 配置管理 ==="
+# # 创建配置文件
+# cat > app.conf << 'EOF'
+# # 应用配置
+# database.host=localhost
+# database.port=5432
+# app.name=BashOOP系统
+# app.version=1.0.0
+# log.level=INFO
+# EOF
 
-Object::loadConfig "app.conf"
-echo "数据库主机: $(Object::getConfig "database.host")"
-echo "应用名称: $(Object::getConfig "app.name")"
+# Object::loadConfig "app.conf"
+# echo "数据库主机: $(Object::getConfig "database.host")"
+# echo "应用名称: $(Object::getConfig "app.name")"
 
-echo -e "\n=== 事件系统 ==="
-Object.create "Employee" "event_emp"
-Employee.constructor "event_emp" "事件员工" "28" "事件公司"
+# echo -e "\n=== 事件系统 ==="
+# Object.create "Employee" "event_emp"
+# Employee.constructor "event_emp" "事件员工" "28" "事件公司"
 
-# 注册事件处理器
-Object.on "event_emp" "work" "work_event_handler"
-Object.on "event_emp" "attrChanged" "attr_change_handler"
+# # 注册事件处理器
+# Object.on "event_emp" "work" "work_event_handler"
+# Object.on "event_emp" "attrChanged" "attr_change_handler"
 
-echo -e "\n触发工作事件:"
-Employee.work "event_emp"
+# echo -e "\n触发工作事件:"
+# Employee.work "event_emp"
 
-echo -e "\n=== 验证器系统 ==="
-Object.create "Employee" "valid_emp"
-Employee.constructor "valid_emp" "验证员工" "25" "验证公司"
+# echo -e "\n=== 验证器系统 ==="
+# Object.create "Employee" "valid_emp"
+# Employee.constructor "valid_emp" "验证员工" "25" "验证公司"
 
-# 添加验证器
-Object.addValidator "valid_emp" "age" "validate_age"
-Object.addValidator "valid_emp" "salary" "validate_salary"
+# # 添加验证器
+# Object.addValidator "valid_emp" "age" "validate_age"
+# Object.addValidator "valid_emp" "salary" "validate_salary"
 
-echo -e "\n测试验证器:"
-echo "设置有效年龄:"
-Object.setAttrWithValidation "valid_emp" "age" "30"
+# echo -e "\n测试验证器:"
+# echo "设置有效年龄:"
+# Object.setAttrWithValidation "valid_emp" "age" "30"
 
-echo -e "\n设置无效年龄:"
-Object.setAttrWithValidation "valid_emp" "age" "16"
+# echo -e "\n设置无效年龄:"
+# Object.setAttrWithValidation "valid_emp" "age" "16"
 
-echo -e "\n设置有效工资:"
-Object.setAttrWithValidation "valid_emp" "salary" "50000"
+# echo -e "\n设置有效工资:"
+# Object.setAttrWithValidation "valid_emp" "salary" "50000"
 
-echo -e "\n设置无效工资:"
-Object.setAttrWithValidation "valid_emp" "salary" "-1000"
+# echo -e "\n设置无效工资:"
+# Object.setAttrWithValidation "valid_emp" "salary" "-1000"
 
-echo -e "\n=== 权限系统 ==="
-Object.create "Employee" "admin_emp"
-Employee.constructor "admin_emp" "管理员" "35" "权限公司"
+# echo -e "\n=== 权限系统 ==="
+# Object.create "Employee" "admin_emp"
+# Employee.constructor "admin_emp" "管理员" "35" "权限公司"
 
-# 添加管理员权限
-Object.addPermission "admin_emp" "admin" "read"
-Object.addPermission "admin_emp" "admin" "write" 
-Object.addPermission "admin_emp" "admin" "delete"
+# # 添加管理员权限
+# Object.addPermission "admin_emp" "admin" "read"
+# Object.addPermission "admin_emp" "admin" "write" 
+# Object.addPermission "admin_emp" "admin" "delete"
 
-echo -e "\n权限检查:"
-Object.checkPermission "admin_emp" "admin" "write"
-Object.checkPermission "admin_emp" "employee" "read"
-Object.checkPermission "admin_emp" "admin" "execute"
+# echo -e "\n权限检查:"
+# Object.checkPermission "admin_emp" "admin" "write"
+# Object.checkPermission "admin_emp" "employee" "read"
+# Object.checkPermission "admin_emp" "admin" "execute"
 
-echo -e "\n=== 事务支持 ==="
-Object.create "Employee" "tx_emp"
-Employee.constructor "tx_emp" "事务员工" "30" "事务公司"
+# echo -e "\n=== 事务支持 ==="
+# Object.create "Employee" "tx_emp"
+# Employee.constructor "tx_emp" "事务员工" "30" "事务公司"
 
-echo -e "\n开始事务:"
-Object.beginTransaction "tx_emp"
-Object.attr "tx_emp" "salary" "10000"
-Object.attr "tx_emp" "position" "高级员工"
-Employee.getInfo "tx_emp"
+# echo -e "\n开始事务:"
+# Object.beginTransaction "tx_emp"
+# Object.attr "tx_emp" "salary" "10000"
+# Object.attr "tx_emp" "position" "高级员工"
+# Employee.getInfo "tx_emp"
 
-echo -e "\n回滚事务:"
-Object.rollbackTransaction "tx_emp"
-Employee.getInfo "tx_emp"
+# echo -e "\n回滚事务:"
+# Object.rollbackTransaction "tx_emp"
+# Employee.getInfo "tx_emp"
 
-echo -e "\n新事务和提交:"
-Object.beginTransaction "tx_emp"
-Object.attr "tx_emp" "salary" "20000"
-Object.attr "tx_emp" "position" "资深员工"
-Employee.getInfo "tx_emp"
-Object.commitTransaction "tx_emp"
-Employee.getInfo "tx_emp"
+# echo -e "\n新事务和提交:"
+# Object.beginTransaction "tx_emp"
+# Object.attr "tx_emp" "salary" "20000"
+# Object.attr "tx_emp" "position" "资深员工"
+# Employee.getInfo "tx_emp"
+# Object.commitTransaction "tx_emp"
+# Employee.getInfo "tx_emp"
 
-echo -e "\n=== 缓存系统 ==="
-echo "设置缓存:"
-Object::cacheSet "user_123" "张三" 60
-Object::cacheSet "config_db" "mysql://localhost:3306" 300
+# echo -e "\n=== 缓存系统 ==="
+# echo "设置缓存:"
+# Object::cacheSet "user_123" "张三" 60
+# Object::cacheSet "config_db" "mysql://localhost:3306" 300
 
-echo -e "\n获取缓存:"
-Object::cacheGet "user_123"
-Object::cacheGet "config_db"
-Object::cacheGet "nonexistent_key"
+# echo -e "\n获取缓存:"
+# Object::cacheGet "user_123"
+# Object::cacheGet "config_db"
+# Object::cacheGet "nonexistent_key"
 
-echo -e "\n=== 数据库持久化 ==="
-Object.create "Employee" "db_emp"
-Employee.constructor "db_emp" "数据库员工" "40" "数据公司"
-Object.attr "db_emp" "salary" "75000"
-Object.attr "db_emp" "position" "数据工程师"
+# echo -e "\n=== 数据库持久化 ==="
+# Object.create "Employee" "db_emp"
+# Employee.constructor "db_emp" "数据库员工" "40" "数据公司"
+# Object.attr "db_emp" "salary" "75000"
+# Object.attr "db_emp" "position" "数据工程师"
 
-echo -e "\n保存到数据库:"
-Object::saveToDB "db_emp"
+# echo -e "\n保存到数据库:"
+# Object::saveToDB "db_emp"
 
-echo -e "\n从数据库加载:"
-Object::loadFromDB "Employee" "loaded_emp"
-Employee.getInfo "loaded_emp"
+# echo -e "\n从数据库加载:"
+# Object::loadFromDB "Employee" "loaded_emp"
+# Employee.getInfo "loaded_emp"
 
-echo -e "\n=== 性能监控 ==="
-echo "性能分析演示:"
-Object::profile "Employee.work" "event_emp"
+# echo -e "\n=== 性能监控 ==="
+# echo "性能分析演示:"
+# Object::profile "Employee.work" "event_emp"
 
-echo -e "\n=== 系统信息 ==="
-Object.static "Object" "systemInfo" '
-    echo "=== 企业级系统信息 ==="
-    local object_count=0
-    for key in "${!OBJECT_PROPS[@]}"; do
-        if [[ "$key" == *"__class" ]]; then
-            ((object_count++))
-        fi
-    done
-    echo "对象总数: $object_count"
-    echo "属性总数: ${#OBJECT_PROPS[@]}"
-    echo "私有属性数: ${#OBJECT_PRIVATE[@]}"
-    echo "关系数量: ${#OBJECT_RELATIONS[@]}"
-    echo "事件数量: ${#OBJECT_EVENTS[@]}"
-    echo "验证器数量: ${#OBJECT_VALIDATORS[@]}"
-    echo "缓存条目: ${#OBJECT_CACHE[@]}"
-    echo "定义的类: Object Person Employee Manager Logger"
-    echo "总方法数: $(declare -F | wc -l)"
-'
+# echo -e "\n=== 系统信息 ==="
+# Object.static "Object" "systemInfo" '
+#     echo "=== 企业级系统信息 ==="
+#     local object_count=0
+#     for key in "${!OBJECT_PROPS[@]}"; do
+#         if [[ "$key" == *"__class" ]]; then
+#             ((object_count++))
+#         fi
+#     done
+#     echo "对象总数: $object_count"
+#     echo "属性总数: ${#OBJECT_PROPS[@]}"
+#     echo "私有属性数: ${#OBJECT_PRIVATE[@]}"
+#     echo "关系数量: ${#OBJECT_RELATIONS[@]}"
+#     echo "事件数量: ${#OBJECT_EVENTS[@]}"
+#     echo "验证器数量: ${#OBJECT_VALIDATORS[@]}"
+#     echo "缓存条目: ${#OBJECT_CACHE[@]}"
+#     echo "定义的类: Object Person Employee Manager Logger"
+#     echo "总方法数: $(declare -F | wc -l)"
+# '
 
-Object::systemInfo
+# Object::systemInfo
 
-echo -e "\n=== 内存管理 ==="
-Object.static "Object" "cleanup" '
-    echo "=== 系统清理 ==="
-    local count_before=${#OBJECT_PROPS[@]}
+# echo -e "\n=== 内存管理 ==="
+# Object.static "Object" "cleanup" '
+#     echo "=== 系统清理 ==="
+#     local count_before=${#OBJECT_PROPS[@]}
     
-    # 找出所有对象实例
-    local instances=()
-    for key in "${!OBJECT_PROPS[@]}"; do
-        if [[ "$key" == *"__class" ]]; then
-            local instance="${key%__class}"
-            instances+=("$instance")
-        fi
-    done
+#     # 找出所有对象实例
+#     local instances=()
+#     for key in "${!OBJECT_PROPS[@]}"; do
+#         if [[ "$key" == *"__class" ]]; then
+#             local instance="${key%__class}"
+#             instances+=("$instance")
+#         fi
+#     done
     
-    # 清理每个对象
-    for instance in "${instances[@]}"; do
-        echo "清理对象: $instance"
-        # 删除对象的所有属性
-        for key in "${!OBJECT_PROPS[@]}"; do
-            if [[ "$key" == ${instance}__* ]]; then
-                unset OBJECT_PROPS["$key"]
-            fi
-        done
-        # 删除对象的私有属性
-        for key in "${!OBJECT_PRIVATE[@]}"; do
-            if [[ "$key" == ${instance}__* ]]; then
-                unset OBJECT_PRIVATE["$key"]
-            fi
-        done
-        # 删除对象的关系
-        for key in "${!OBJECT_RELATIONS[@]}"; do
-            if [[ "$key" == ${instance}__* ]]; then
-                unset OBJECT_RELATIONS["$key"]
-            fi
-        done
-        # 删除对象的事件
-        for key in "${!OBJECT_EVENTS[@]}"; do
-            if [[ "$key" == ${instance}__* ]]; then
-                unset OBJECT_EVENTS["$key"]
-            fi
-        done
-        # 删除对象的验证器
-        for key in "${!OBJECT_VALIDATORS[@]}"; do
-            if [[ "$key" == ${instance}__* ]]; then
-                unset OBJECT_VALIDATORS["$key"]
-            fi
-        done
-    done
+#     # 清理每个对象
+#     for instance in "${instances[@]}"; do
+#         echo "清理对象: $instance"
+#         # 删除对象的所有属性
+#         for key in "${!OBJECT_PROPS[@]}"; do
+#             if [[ "$key" == ${instance}__* ]]; then
+#                 unset OBJECT_PROPS["$key"]
+#             fi
+#         done
+#         # 删除对象的私有属性
+#         for key in "${!OBJECT_PRIVATE[@]}"; do
+#             if [[ "$key" == ${instance}__* ]]; then
+#                 unset OBJECT_PRIVATE["$key"]
+#             fi
+#         done
+#         # 删除对象的关系
+#         for key in "${!OBJECT_RELATIONS[@]}"; do
+#             if [[ "$key" == ${instance}__* ]]; then
+#                 unset OBJECT_RELATIONS["$key"]
+#             fi
+#         done
+#         # 删除对象的事件
+#         for key in "${!OBJECT_EVENTS[@]}"; do
+#             if [[ "$key" == ${instance}__* ]]; then
+#                 unset OBJECT_EVENTS["$key"]
+#             fi
+#         done
+#         # 删除对象的验证器
+#         for key in "${!OBJECT_VALIDATORS[@]}"; do
+#             if [[ "$key" == ${instance}__* ]]; then
+#                 unset OBJECT_VALIDATORS["$key"]
+#             fi
+#         done
+#     done
     
-    local count_after=${#OBJECT_PROPS[@]}
-    echo "清理完成: 移除 $((count_before - count_after)) 个属性"
+#     local count_after=${#OBJECT_PROPS[@]}
+#     echo "清理完成: 移除 $((count_before - count_after)) 个属性"
     
-    # 清理缓存
-    OBJECT_CACHE=()
-    echo "缓存已清空"
-'
+#     # 清理缓存
+#     OBJECT_CACHE=()
+#     echo "缓存已清空"
+# '
 
-echo "清理前:"
-Object::systemInfo
-Object::cleanup
-echo -e "\n清理后:"
-Object::systemInfo
+# echo "清理前:"
+# Object::systemInfo
+# Object::cleanup
+# echo -e "\n清理后:"
+# Object::systemInfo
 
-echo -e "\n=== 企业级特性总结 ==="
-echo "🎯 新增企业级功能:"
-echo "✅ 事件系统 - 发布/订阅模式"
-echo "✅ 验证器系统 - 数据验证和约束"
-echo "✅ 权限系统 - 基于角色的访问控制"
-echo "✅ 事务支持 - ACID特性模拟"
-echo "✅ 缓存系统 - TTL缓存管理"
-echo "✅ 配置管理 - 外部配置加载"
-echo "✅ 数据库持久化 - 对象存储和恢复"
-echo "✅ 性能监控 - 函数执行时间分析"
-echo "✅ 完整的系统监控 - 资源使用统计"
+# echo -e "\n=== 企业级特性总结 ==="
+# echo "🎯 新增企业级功能:"
+# echo "✅ 事件系统 - 发布/订阅模式"
+# echo "✅ 验证器系统 - 数据验证和约束"
+# echo "✅ 权限系统 - 基于角色的访问控制"
+# echo "✅ 事务支持 - ACID特性模拟"
+# echo "✅ 缓存系统 - TTL缓存管理"
+# echo "✅ 配置管理 - 外部配置加载"
+# echo "✅ 数据库持久化 - 对象存储和恢复"
+# echo "✅ 性能监控 - 函数执行时间分析"
+# echo "✅ 完整的系统监控 - 资源使用统计"
 
-echo -e "\n💼 适用场景:"
-echo "📊 企业级应用开发"
-echo "🔧 复杂系统配置管理"
-echo "🛡️ 安全敏感的权限控制"
-echo "📈 高性能要求的场景"
-echo "💾 数据持久化需求"
-echo "🔍 系统监控和调试"
+# echo -e "\n💼 适用场景:"
+# echo "📊 企业级应用开发"
+# echo "🔧 复杂系统配置管理"
+# echo "🛡️ 安全敏感的权限控制"
+# echo "📈 高性能要求的场景"
+# echo "💾 数据持久化需求"
+# echo "🔍 系统监控和调试"
 
-echo -e "\n🚀 Bash 面向对象系统现已具备企业级应用开发能力!"
+# echo -e "\n🚀 Bash 面向对象系统现已具备企业级应用开发能力!"
