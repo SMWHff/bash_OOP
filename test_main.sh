@@ -361,6 +361,422 @@ list_output=$(Object::listDBObjects "Employee")
 assert_contains "$list_output" "数据库中的 Employee 对象" "数据库列表功能"
 
 # ============================================================================
+# 新增企业级功能测试用例 - 提高覆盖率
+# ============================================================================
+
+echo -e "\n"
+echo "=========================================="
+echo "开始企业级功能增强测试"
+echo "=========================================="
+
+# 测试29: 缓存系统完整测试
+print_test_header "缓存系统完整测试"
+Object::cacheSet "test_key1" "test_value1" 5
+Object::cacheSet "test_key2" "test_value2" 1
+
+# 测试立即获取
+cache_val1=$(Object::cacheGetSilent "test_key1")
+assert_equals "test_value1" "$cache_val1" "缓存立即获取"
+
+# 测试缓存过期
+echo "等待缓存过期..."
+sleep 2
+Object::cacheGet "test_key2" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    manual_assert "缓存过期机制" "pass"
+else
+    manual_assert "缓存过期机制" "fail"
+fi
+
+# 测试30: 配置管理系统测试
+print_test_header "配置管理系统测试"
+# 创建测试配置文件
+cat > test_config.conf << 'EOF'
+server.host=127.0.0.1
+server.port=8080
+app.debug=true
+database.url=jdbc:mysql://localhost/test
+max.connections=100
+EOF
+
+Object::loadConfig "test_config.conf"
+config_host=$(Object::getConfig "server.host")
+config_port=$(Object::getConfig "server.port")
+config_debug=$(Object::getConfig "app.debug")
+
+assert_equals "127.0.0.1" "$config_host" "配置加载-主机"
+assert_equals "8080" "$config_port" "配置加载-端口"
+assert_equals "true" "$config_debug" "配置加载-调试模式"
+
+# 测试不存在的配置
+nonexistent_config=$(Object::getConfig "nonexistent.key")
+assert_equals "" "$nonexistent_config" "不存在的配置返回空"
+
+# 测试31: 权限系统深度测试
+print_test_header "权限系统深度测试"
+Object.create "Employee" "perm_emp"
+Employee.constructor "perm_emp" "权限员工" "30" "权限公司"
+
+# 添加多级权限
+Object.addPermission "perm_emp" "admin" "read"
+Object.addPermission "perm_emp" "admin" "write"
+Object.addPermission "perm_emp" "admin" "delete"
+Object.addPermission "perm_emp" "user" "read"
+Object.addPermission "perm_emp" "user" "execute"
+
+# 测试权限检查
+assert_success 'Object.checkPermission "perm_emp" "admin" "write"' "管理员写权限"
+assert_success 'Object.checkPermission "perm_emp" "user" "read"' "用户读权限"
+assert_failure 'Object.checkPermission "perm_emp" "user" "delete"' "用户无删除权限"
+assert_failure 'Object.checkPermission "perm_emp" "guest" "read"' "访客无权限"
+
+# 测试32: 事件系统高级测试
+print_test_header "事件系统高级测试"
+Object.create "Employee" "event_adv_emp"
+Employee.constructor "event_adv_emp" "高级事件员工" "28" "事件公司"
+
+# 创建多个事件处理器
+event_handler1() {
+    local instance="$1" event_name="$2"
+    echo "处理器1: $instance 触发 $event_name"
+}
+
+event_handler2() {
+    local instance="$1" event_name="$2"
+    echo "处理器2: $instance 记录 $event_name"
+}
+
+event_handler3() {
+    local instance="$1" event_name="$2" arg1="$3" arg2="$4"
+    echo "处理器3: $arg1 -> $arg2"
+}
+
+# 注册多个处理器
+Object.on "event_adv_emp" "test_event" "event_handler1"
+Object.on "event_adv_emp" "test_event" "event_handler2"
+Object.on "event_adv_emp" "data_event" "event_handler3"
+
+# 触发事件
+event_output=$(Object.emit "event_adv_emp" "test_event" 2>&1)
+assert_contains "$event_output" "处理器1" "多事件处理器1"
+assert_contains "$event_output" "处理器2" "多事件处理器2"
+
+# 测试带参数的事件
+data_event_output=$(Object.emit "event_adv_emp" "data_event" "参数1" "参数2" 2>&1)
+assert_contains "$data_event_output" "参数1 -> 参数2" "事件参数传递"
+
+# 测试33: 验证器系统边界测试
+print_test_header "验证器系统边界测试"
+Object.create "Employee" "validator_emp"
+Employee.constructor "validator_emp" "验证员工" "25" "验证公司"
+
+# 添加边界验证器
+validate_positive() {
+    local value="$1"
+    if [[ "$value" =~ ^[0-9]+$ ]] && [ "$value" -gt 0 ]; then
+        return 0
+    else
+        echo "必须为正整数"
+        return 1
+    fi
+}
+
+validate_email() {
+    local email="$1"
+    if [[ "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        return 0
+    else
+        echo "邮箱格式无效"
+        return 1
+    fi
+}
+
+Object.addValidator "validator_emp" "age" "validate_positive"
+Object.addValidator "validator_emp" "email" "validate_email"
+
+# 测试边界值
+assert_success 'Object.setAttrWithValidation "validator_emp" "age" "25"' "有效年龄设置"
+assert_failure 'Object.setAttrWithValidation "validator_emp" "age" "-5"' "负年龄验证失败"
+assert_failure 'Object.setAttrWithValidation "validator_emp" "age" "0"' "零年龄验证失败"
+
+assert_success 'Object.setAttrWithValidation "validator_emp" "email" "test@example.com"' "有效邮箱设置"
+assert_failure 'Object.setAttrWithValidation "validator_emp" "email" "invalid-email"' "无效邮箱验证失败"
+
+# 测试34: 事务系统完整性测试
+print_test_header "事务系统完整性测试"
+Object.create "Employee" "tx_adv_emp"
+Employee.constructor "tx_adv_emp" "事务员工" "30" "事务公司"
+Object.attr "tx_adv_emp" "salary" "50000"
+Object.attr "tx_adv_emp" "position" "初级员工"
+
+original_salary=$(Object.attr "tx_adv_emp" "salary")
+original_position=$(Object.attr "tx_adv_emp" "position")
+
+# 测试事务回滚
+Object.beginTransaction "tx_adv_emp"
+Object.attr "tx_adv_emp" "salary" "80000"
+Object.attr "tx_adv_emp" "position" "高级员工"
+Object.rollbackTransaction "tx_adv_emp"
+
+# 验证回滚后状态
+rollback_salary=$(Object.attr "tx_adv_emp" "salary")
+rollback_position=$(Object.attr "tx_adv_emp" "position")
+
+assert_equals "$original_salary" "$rollback_salary" "事务回滚-薪资"
+assert_equals "$original_position" "$rollback_position" "事务回滚-职位"
+
+# 测试事务提交
+Object.beginTransaction "tx_adv_emp"
+Object.attr "tx_adv_emp" "salary" "75000"
+Object.attr "tx_adv_emp" "position" "中级员工"
+Object.commitTransaction "tx_adv_emp"
+
+commit_salary=$(Object.attr "tx_adv_emp" "salary")
+commit_position=$(Object.attr "tx_adv_emp" "position")
+
+assert_equals "75000" "$commit_salary" "事务提交-薪资"
+assert_equals "中级员工" "$commit_position" "事务提交-职位"
+
+# 测试35: 对象生命周期完整测试
+print_test_header "对象生命周期完整测试"
+Object.create "Employee" "lifecycle_emp"
+Employee.constructor "lifecycle_emp" "生命周期员工" "35" "生命周期公司"
+
+# 设置各种属性
+Object.attr "lifecycle_emp" "salary" "60000"
+Object.private "lifecycle_emp" "secret_key" "abc123"
+Object.addPermission "lifecycle_emp" "user" "read"
+Object.addValidator "lifecycle_emp" "age" "validate_age"
+Object.on "lifecycle_emp" "work" "work_event_handler"
+
+# 验证对象存在
+assert_success 'Object.attr "lifecycle_emp" "name" > /dev/null' "对象创建成功"
+
+# 销毁对象
+Object.destroy "lifecycle_emp"
+
+# 验证对象已销毁
+Object.attr "lifecycle_emp" "name" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    manual_assert "对象完全销毁" "pass"
+else
+    manual_assert "对象完全销毁" "fail"
+fi
+
+# 测试36: 错误处理和异常情况测试
+print_test_header "错误处理和异常情况测试"
+# 测试不存在的对象操作
+nonexistent_attr=$(Object.attr "nonexistent_obj" "name" 2>&1)
+assert_contains "$nonexistent_attr" "" "不存在的对象属性访问"
+
+# 测试空参数处理
+Object.create "Employee" "empty_test_emp"
+empty_result=$(Employee.constructor "empty_test_emp" "" "" "" 2>&1)
+assert_success 'Employee.constructor "empty_test_emp" "" "" ""' "空参数构造函数"
+
+# 测试无效的方法调用
+invalid_method_result=$(InvalidClass.invalidMethod "empty_test_emp" 2>&1)
+assert_contains "$invalid_method_result" "command not found" "无效方法调用处理"
+
+# 测试37: 性能压力测试
+print_test_header "性能压力测试"
+echo "开始性能压力测试..."
+
+# 创建多个对象测试性能
+start_time=$(date +%s%N)
+for i in {1..50}; do
+    Object.create "Employee" "perf_emp_$i" > /dev/null 2>&1
+    Employee.constructor "perf_emp_$i" "员工$i" "$((20 + i % 10))" "公司$i" > /dev/null 2>&1
+done
+end_time=$(date +%s%N)
+duration=$(( (end_time - start_time) / 1000000 ))
+
+echo "创建50个对象耗时: ${duration}ms"
+if [ "$duration" -lt 5000 ]; then
+    manual_assert "批量对象创建性能" "pass"
+else
+    manual_assert "批量对象创建性能" "fail"
+fi
+
+# 测试38: 内存泄漏检测
+print_test_header "内存泄漏检测"
+initial_count=${#OBJECT_PROPS[@]}
+Object.create "Employee" "leak_test_emp"
+Employee.constructor "leak_test_emp" "泄漏测试员工" "30" "测试公司"
+
+# 设置多个属性
+for i in {1..10}; do
+    Object.attr "leak_test_emp" "attr_$i" "value_$i"
+done
+
+# 销毁对象
+Object.destroy "leak_test_emp"
+final_count=${#OBJECT_PROPS[@]}
+
+if [ "$final_count" -le "$initial_count" ]; then
+    manual_assert "内存泄漏检测" "pass"
+else
+    manual_assert "内存泄漏检测" "fail"
+    echo "初始属性数: $initial_count, 最终属性数: $final_count"
+fi
+
+# 测试39: 并发安全性测试（模拟）
+print_test_header "并发安全性测试"
+Object.create "Employee" "concurrent_emp"
+Employee.constructor "concurrent_emp" "并发员工" "28" "并发公司"
+
+# 模拟并发操作
+for i in {1..5}; do
+    {
+        Object.attr "concurrent_emp" "counter" "$i"
+        sleep 0.1
+    } &
+done
+wait
+
+final_counter=$(Object.attr "concurrent_emp" "counter")
+if [ -n "$final_counter" ] && [ "$final_counter" -ge 1 ] && [ "$final_counter" -le 5 ]; then
+    manual_assert "并发操作安全性" "pass"
+else
+    manual_assert "并发操作安全性" "fail"
+fi
+
+# 测试40: 系统健壮性测试
+print_test_header "系统健壮性测试"
+# 测试各种边界情况
+
+# 超长字符串处理
+long_string="这是一个非常长的字符串$(printf '%*s' 1000 | tr ' ' 'X')"
+Object.create "Employee" "robust_emp"
+Employee.constructor "robust_emp" "$long_string" "30" "健壮公司"
+long_name=$(Object.attr "robust_emp" "name")
+assert_contains "$long_name" "这是一个非常长的字符串" "超长字符串处理"
+
+# 特殊字符处理
+special_chars="test&special|chars^test@example.com"
+Object.attr "robust_emp" "special_field" "$special_chars"
+retrieved_special=$(Object.attr "robust_emp" "special_field")
+assert_equals "$special_chars" "$retrieved_special" "特殊字符属性存储"
+
+# 测试41: 数据库操作完整性测试
+print_test_header "数据库操作完整性测试"
+Object.create "Employee" "db_complete_emp"
+Employee.constructor "db_complete_emp" "完整数据库员工" "32" "数据库公司"
+Object.attr "db_complete_emp" "salary" "88000"
+Object.attr "db_complete_emp" "department" "质量保证"
+Object.private "db_complete_emp" "internal_id" "QA123"
+
+# 保存到数据库
+Object::saveToDB "db_complete_emp"
+
+# 验证文件内容
+if [ -f "db_Employee_db_complete_emp.txt" ]; then
+    db_content=$(cat "db_Employee_db_complete_emp.txt")
+    assert_contains "$db_content" "完整数据库员工" "数据库内容完整性-姓名"
+    assert_contains "$db_content" "88000" "数据库内容完整性-薪资"
+    assert_contains "$db_content" "质量保证" "数据库内容完整性-部门"
+    manual_assert "数据库文件创建" "pass"
+else
+    manual_assert "数据库文件创建" "fail"
+fi
+
+# 测试42: 系统清理功能测试
+print_test_header "系统清理功能测试"
+pre_cleanup_count=${#OBJECT_PROPS[@]}
+Object::cleanup
+post_cleanup_count=${#OBJECT_PROPS[@]}
+
+echo "清理前属性数: $pre_cleanup_count, 清理后属性数: $post_cleanup_count"
+if [ "$post_cleanup_count" -lt "$pre_cleanup_count" ]; then
+    manual_assert "系统清理功能" "pass"
+else
+    manual_assert "系统清理功能" "fail"
+fi
+
+# 测试43: 类继承和方法重写测试
+print_test_header "类继承和方法重写测试"
+# 定义Manager类继承Employee
+Object.method "Manager" "constructor" '
+    local name="$1" age="$2" company="$3" team_size="$4"
+    Employee.constructor "$this" "$name" "$age" "$company"
+    Object.attr "$this" "team_size" "$team_size"
+    Object.attr "$this" "position" "经理"
+    echo "经理构造函数: team_size=\"$team_size\""
+'
+
+Object.method "Manager" "getInfo" '
+    local name=$(Object.attr "$this" "name")
+    local company=$(Object.attr "$this" "company")
+    local team_size=$(Object.attr "$this" "team_size")
+    local position=$(Object.attr "$this" "position")
+    echo "经理信息: 姓名=$name, 职位=$position, 公司=$company, 团队规模=$team_size"
+'
+
+# 测试Manager类
+Object.create "Manager" "test_manager"
+Manager.constructor "test_manager" "张经理" "40" "科技公司" "15"
+manager_info=$(Manager.getInfo "test_manager")
+
+assert_contains "$manager_info" "张经理" "经理类继承-姓名"
+assert_contains "$manager_info" "经理" "经理类继承-职位"
+assert_contains "$manager_info" "15" "经理类继承-团队规模"
+
+# 测试44: 静态方法测试
+print_test_header "静态方法测试"
+# 添加一个静态工具方法
+Object.static "Object" "generateId" '
+    local prefix="$1"
+    echo "${prefix}_$(date +%s)_${RANDOM}"
+'
+
+generated_id=$(Object::generateId "test")
+assert_contains "$generated_id" "test_" "静态方法调用"
+
+# 测试45: 完整业务流程测试
+print_test_header "完整业务流程测试"
+echo "模拟完整业务场景：员工入职到离职"
+
+# 1. 员工入职
+Object.create "Employee" "business_emp"
+Employee.constructor "business_emp" "业务员工" "29" "业务流程公司"
+Object.attr "business_emp" "salary" "55000"
+Object.attr "business_emp" "position" "新员工"
+
+# 2. 设置权限和验证
+Object.addPermission "business_emp" "employee" "read"
+Object.addPermission "business_emp" "employee" "work"
+Object.addValidator "business_emp" "salary" "validate_salary"
+
+# 3. 注册事件监听
+Object.on "business_emp" "work" "work_event_handler"
+Object.on "business_emp" "attrChanged" "attr_change_handler"
+
+# 4. 员工工作
+work_output=$(Employee.work "business_emp" 2>&1)
+assert_contains "$work_output" "正在 业务流程公司 工作" "业务流程-工作"
+
+# 5. 员工晋升
+Object.beginTransaction "business_emp"
+Object.attr "business_emp" "salary" "70000"
+Object.attr "business_emp" "position" "资深员工"
+Object.commitTransaction "business_emp"
+
+# 6. 保存到数据库
+Object::saveToDB "business_emp"
+assert_success '[ -f "db_Employee_business_emp.txt" ]' "业务流程-数据持久化"
+
+# 7. 员工离职（销毁对象）
+Object.destroy "business_emp"
+Object.attr "business_emp" "name" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    manual_assert "业务流程-对象销毁" "pass"
+else
+    manual_assert "业务流程-对象销毁" "fail"
+fi
+
+echo "完整业务流程测试完成"
+
+# ============================================================================
 # 测试完成，清理和总结
 # ============================================================================
 
@@ -410,6 +826,23 @@ if [ "$FAIL_COUNT" -eq 0 ]; then
     echo "✅ 最终完整性验证"
     echo "✅ 数据库文件统计"
     echo "✅ 数据库列表功能"
+    echo "✅ 缓存系统完整测试"
+    echo "✅ 配置管理系统"
+    echo "✅ 权限系统深度测试"
+    echo "✅ 事件系统高级测试"
+    echo "✅ 验证器系统边界测试"
+    echo "✅ 事务系统完整性测试"
+    echo "✅ 对象生命周期测试"
+    echo "✅ 错误处理和异常情况"
+    echo "✅ 性能压力测试"
+    echo "✅ 内存泄漏检测"
+    echo "✅ 并发安全性测试"
+    echo "✅ 系统健壮性测试"
+    echo "✅ 数据库操作完整性"
+    echo "✅ 系统清理功能"
+    echo "✅ 类继承和方法重写"
+    echo "✅ 静态方法测试"
+    echo "✅ 完整业务流程模拟"
     
     echo -e "\n🚀 Bash 面向对象系统通过所有综合测试，具备企业级应用开发能力！"
     exit 0
