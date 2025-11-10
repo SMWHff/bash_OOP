@@ -1,8 +1,0 @@
-#OBJECT_START emp1 2025-11-10 15:23:10
-PROP:company=电商平台
-PROP:permissions__employee= read work
-PROP:salary=90000
-PROP:age=28
-PROP:name=赵六
-PROP:position=技术专家
-#OBJECT_END emp1

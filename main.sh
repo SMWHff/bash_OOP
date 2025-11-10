@@ -132,7 +132,7 @@ Object.method "Object" "setAttrWithValidation" '
     fi
 '
 
-# 数据库持久化 - 完整修复版本
+# 修复数据库保存函数 - 支持多对象存储
 Object.static "Object" "saveToDB" '
     local instance="$1"
     local class=$(Object.attr "$instance" "class")
@@ -140,8 +140,10 @@ Object.static "Object" "saveToDB" '
     
     echo "保存对象到数据库: $instance (类: $class, ID: $id)"
     
-    # 模拟数据库表
-    local db_file="db_${class}.txt"
+    # 使用实例名作为文件名的一部分，避免冲突
+    local db_file="db_${class}_${instance}.txt"
+    
+    # 保存对象数据
     {
         echo "#OBJECT_START $instance $(date "+%Y-%m-%d %H:%M:%S")"
         for key in "${!OBJECT_PROPS[@]}"; do
@@ -153,6 +155,7 @@ Object.static "Object" "saveToDB" '
                     # 对值进行编码，处理特殊字符
                     value="${value//$'\n'/\\n}"
                     value="${value//$'\r'/\\r}"
+                    value="${value//$'='/\\=}"
                     echo "PROP:${prop_name}=${value}"
                 fi
             fi
@@ -165,12 +168,13 @@ Object.static "Object" "saveToDB" '
     grep "^PROP:" "$db_file" | sed 's/^PROP://'
 '
 
+# 修复数据库加载函数
 Object.static "Object" "loadFromDB" '
     local class="$1" instance="$2"
-    local db_file="db_${class}.txt"
+    local db_file="db_${class}_${instance}.txt"
     
     if [ ! -f "$db_file" ]; then
-        echo "数据库文件不存在: $db_file"
+        echo "错误: 数据库文件不存在: $db_file"
         return 1
     fi
     
@@ -178,15 +182,18 @@ Object.static "Object" "loadFromDB" '
     Object.create "$class" "$instance"
     
     local in_object=0
+    local current_instance=""
+    
     while IFS= read -r line; do
-        # 检查对象开始标记 - 不再检查实例名，遇到第一个对象就开始
-        if [[ "$line" == "#OBJECT_START "* ]]; then
+        # 检查对象开始标记
+        if [[ "$line" == "#OBJECT_START $instance "* ]]; then
             in_object=1
+            current_instance="$instance"
             continue
         fi
         
         # 检查对象结束标记
-        if [[ "$line" == "#OBJECT_END "* ]]; then
+        if [[ "$line" == "#OBJECT_END $instance" ]]; then
             break
         fi
         
@@ -198,6 +205,7 @@ Object.static "Object" "loadFromDB" '
             # 解码特殊字符
             value="${value//\\n/$'\n'}"
             value="${value//\\r/$'\r'}"
+            value="${value//\\=/$'='}"
             
             Object.attr "$instance" "$prop_name" "$value"
             echo "加载属性: $prop_name = $value"
@@ -205,10 +213,30 @@ Object.static "Object" "loadFromDB" '
     done < "$db_file"
     
     if [ "$in_object" -eq 0 ]; then
-        echo "警告: 在数据库中未找到对象数据"
+        echo "警告: 在数据库中未找到对象 $instance 的数据"
+        return 1
     else
         echo "加载完成: $instance"
+        return 0
     fi
+'
+
+# 添加数据库工具函数
+Object.static "Object" "listDBObjects" '
+    local class="$1"
+    echo "=== 数据库中的 $class 对象 ==="
+    for file in db_${class}_*.txt 2>/dev/null; do
+        if [ -f "$file" ]; then
+            local instance=$(basename "$file" .txt | sed "s/db_${class}_//")
+            echo "对象: $instance, 文件: $file"
+        fi
+    done
+'
+
+Object.static "Object" "cleanupDB" '
+    echo "清理数据库文件..."
+    rm -f db_*.txt 2>/dev/null
+    echo "数据库清理完成"
 '
 
 # 添加对象销毁方法
