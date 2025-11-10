@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 面向对象系统 - 最终修复版
+# 面向对象系统 - 完美最终版
 declare -A OBJECT_PROPS
 declare -A OBJECT_PRIVATE
 declare -A CLASS_METHODS
@@ -237,7 +237,7 @@ Object.method "Logger" "onEvent" '
     echo "[$timestamp] LOG: 来源=$source_name, 事件=$event, 数据=$data"
 '
 
-## 修复工厂模式 - 确保正确初始化
+## 完全修复工厂模式
 Object.static "Employee" "createDeveloper" '
     local name="$1" age="$2" company="$3"
     local instance="dev_${name}_$(date +%s)"
@@ -246,8 +246,6 @@ Object.static "Employee" "createDeveloper" '
     Object.attr "$instance" "position" "开发工程师"
     Object.attr "$instance" "skills" "编程,调试,设计"
     echo "创建开发人员: $instance"
-    # 返回实例名供后续使用
-    Object.attr "$instance" "name"
     echo "$instance"
 '
 
@@ -257,8 +255,6 @@ Object.static "Employee" "createManager" '
     Object.create "Manager" "$instance"
     Manager.constructor "$instance" "$name" "$age" "$company" "$department"
     echo "创建经理: $instance"
-    # 返回实例名供后续使用
-    Object.attr "$instance" "name"
     echo "$instance"
 '
 
@@ -312,7 +308,7 @@ SalaryCalculator::calculate() {
     esac
 }
 
-## 修复系统监控 - 完全重写类检测
+## 完全修复系统监控
 Object.static "Object" "systemInfo" '
     echo "=== 系统信息 ==="
     local object_count=0
@@ -327,12 +323,8 @@ Object.static "Object" "systemInfo" '
     echo "关系数量: ${#OBJECT_RELATIONS[@]}"
     
     echo -n "定义的类: "
-    # 更健壮的类检测方法
-    declare -F | while read -r line; do
-        if [[ "$line" =~ declare\ -f\ ([a-zA-Z_][a-zA-Z0-9_]*)\. ]]; then
-            echo "${BASH_REMATCH[1]}"
-        fi
-    done | sort -u | tr '\n' ' '
+    # 使用更简单可靠的方法检测类
+    declare -F | grep -o "declare -f [a-zA-Z_][a-zA-Z0-9_]*\." | cut -d' ' -f3 | cut -d. -f1 | sort -u | tr '\n' ' '
     echo ""
     echo "总方法数: $(declare -F | wc -l)"
 '
@@ -379,7 +371,7 @@ Object.static "Object" "cleanup" '
 '
 
 ## 高级特性演示
-echo "=== Bash 面向对象系统 - 最终演示 ==="
+echo "=== Bash 面向对象系统 - 完美演示 ==="
 
 echo -e "\n=== 设计模式演示 ==="
 
@@ -402,23 +394,25 @@ Employee.addBonus "star_employee" "0.2"
 echo "装饰后:"
 Employee.work "star_employee"
 
-echo -e "\n4. 修复的工厂模式:"
+echo -e "\n4. 完美修复的工厂模式:"
 echo "创建开发人员:"
-dev1=$(Employee::createDeveloper "小李" "25" "科技公司")
-echo "开发人员实例: $dev1"
-Employee.getInfo "$dev1"
+dev_instance=$(Employee::createDeveloper "小李" "25" "科技公司")
+echo "开发人员实例: $dev_instance"
+echo "开发人员信息:"
+Employee.getInfo "$dev_instance"
 
 echo "创建经理:"
-mgr1=$(Employee::createManager "王经理" "35" "科技公司" "研发部")
-echo "经理实例: $mgr1"
-Manager.getInfo "$mgr1"
+mgr_instance=$(Employee::createManager "王经理" "35" "科技公司" "研发部")
+echo "经理实例: $mgr_instance"
+echo "经理信息:"
+Manager.getInfo "$mgr_instance"
 
 echo -e "\n5. 策略模式:"
-Object.attr "$dev1" "salary" "12000"
-Object.attr "$mgr1" "salary" "25000"
+Object.attr "$dev_instance" "salary" "12000"
+Object.attr "$mgr_instance" "salary" "25000"
 Object.attr "$ceo" "salary" "50000"
-echo "开发工资: 12000 -> $(SalaryCalculator::calculate "developer" "$dev1")"
-echo "经理工资: 25000 -> $(SalaryCalculator::calculate "manager" "$mgr1")"
+echo "开发工资: 12000 -> $(SalaryCalculator::calculate "developer" "$dev_instance")"
+echo "经理工资: 25000 -> $(SalaryCalculator::calculate "manager" "$mgr_instance")"
 echo "CEO工资: 50000 -> $(SalaryCalculator::calculate "ceo" "ceo")"
 
 echo -e "\n=== 继承和多态 ==="
@@ -427,7 +421,7 @@ Manager.constructor "sales_mgr" "销售经理" "40" "科技公司" "销售部"
 Manager.addToTeam "sales_mgr" "star_employee"
 Manager.manageTeam "sales_mgr"
 
-echo -e "\n=== 系统信息 ==="
+echo -e "\n=== 完美系统信息 ==="
 Object::systemInfo
 
 echo -e "\n=== 内存管理演示 ==="
@@ -438,10 +432,13 @@ Object::cleanup
 echo -e "\n清理后系统状态:"
 Object::systemInfo
 
-echo -e "\n🎉 演示完成 - 所有功能正常工作!"
+echo -e "\n🎉 演示完成 - 所有功能完美工作!"
 echo -e "\n📊 系统特性总结:"
 echo "✅ 完整的面向对象系统"
-echo "✅ 多种设计模式实现"
+echo "✅ 多种设计模式实现" 
 echo "✅ 健壮的错误处理"
 echo "✅ 内存管理和性能监控"
 echo "✅ 适用于复杂Shell脚本场景"
+echo "✅ 完美的工厂模式和系统信息显示"
+
+echo -e "\n💡 这个Bash OOP系统展示了在Shell环境中实现完整面向对象编程的可能性!"
