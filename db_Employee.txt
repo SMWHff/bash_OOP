@@ -1,0 +1,11 @@
+# db_emp - Mon Nov 10 11:58:10 CST 2025
+position=数据工程师
+class=Employee
+name=数据库员工
+created=2025-11-10 11:58:10
+id=obj_1762747090_4032
+age=40
+company=数据公司
+permissions__employee= read work
+salary=75000
+---
