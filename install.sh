@@ -33,7 +33,7 @@ else
     echo "本地安装完成！"
     echo "使用方法: source main.sh"
     echo "演示: ./examples/demo.sh"
-    echo "测试: ./examples/test.sh"
+    echo "测试: ./tests/full_test.sh"
 fi
 
 echo ""
