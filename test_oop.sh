@@ -3,7 +3,7 @@
 # 修复版综合测试用例文件：test_comprehensive_fixed.sh
 
 # 引入被测试的主脚本
-source main.sh
+source oop.sh
 
 # 全局计数变量
 PASS_COUNT=0
